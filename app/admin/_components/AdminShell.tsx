@@ -6,9 +6,6 @@ import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { ADMIN_NAV, type AdminPageKey } from "../_lib/data";
 
-const createBtn =
-  "ml-auto inline-flex h-[42px] flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-5 text-sm font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
-
 function NavLinks({
   active,
   itemClassName,
@@ -156,10 +153,6 @@ export default function AdminShell({
               />
               <span className="pointer-events-none absolute left-[15px] top-[13px] h-3 w-3 rounded-full border-[1.5px] border-[#6B6B6B]" />
             </div>
-            <Link href="/admin/events?create=1" className={createBtn}>
-              <span className="hidden sm:inline">+ Create event</span>
-              <span className="sm:hidden">+ New</span>
-            </Link>
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#141414] text-[13px] font-bold text-white">
               {initials}
             </span>

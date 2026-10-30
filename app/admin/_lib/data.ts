@@ -8,7 +8,7 @@ export type AdminPageKey =
   | "settings";
 
 export const ADMIN_NAV: { key: AdminPageKey; label: string; href: string }[] = [
-  { key: "overview", label: "Overview", href: "/admin" },
+  { key: "overview", label: "Overview", href: "/admin/dashboard" },
   { key: "events", label: "Events", href: "/admin/events" },
   { key: "bookings", label: "Bookings", href: "/admin#bookings" },
   { key: "attendees", label: "Attendees", href: "/admin/check-in" },
