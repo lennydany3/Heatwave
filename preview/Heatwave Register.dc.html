@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&amp;display=swap">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:#fff;color:#141414;font-family:Satoshi,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#141414;text-decoration:none}a:hover{color:#E5251B}
+*{box-sizing:border-box}
+input::placeholder{color:transparent}
+@keyframes hwSpin{to{transform:rotate(360deg)}}
+@keyframes hwPop{0%{transform:scale(.6);opacity:0}100%{transform:scale(1);opacity:1}}
+</style>
+</helmet>
+<div style="min-height:100vh">
+<header style="border-bottom:1px solid #EDE6E3">
+<div style="max-width:1200px;margin:0 auto;padding:18px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+<a href="Heatwave Event.dc.html" style="font-weight:900;font-size:20px;letter-spacing:-0.04em;display:flex;align-items:center;gap:6px">heatwave<span style="width:7px;height:7px;border-radius:999px;background:#E5251B"></span></a>
+<a href="Heatwave Event.dc.html" style="font-size:14px;font-weight:500;color:#6B6B6B">← Back to event</a>
+</div>
+</header>
+<sc-if value="{{ inForm }}" hint-placeholder-val="{{ true }}">
+<main style="max-width:1200px;margin:0 auto;padding:40px 24px 96px">
+<sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+<div style="margin:-16px 0 32px;border:1px solid #EDE6E3;border-radius:12px;background:#FAF7F5">
+<button onClick="{{ toggleSum }}" style="all:unset;cursor:pointer;box-sizing:border-box;width:100%;padding:16px 18px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">ORDER SUMMARY</span><span style="font-size:15px;font-weight:500">{{ lineL }}</span></span>
+<span style="display:flex;align-items:center;gap:10px;font-size:18px;font-weight:900">{{ totalA }}<span style="font-size:12px;color:#6B6B6B;transition:transform .25s;transform:{{ sumArrow }}">▼</span></span>
+</button>
+<sc-if value="{{ sumOpen }}" hint-placeholder-val="{{ false }}">
+<div style="padding:0 18px 18px;display:flex;flex-direction:column;gap:12px">
+<div style="display:flex;gap:14px;align-items:center">
+<div style="flex:none;width:72px;height:72px"><image-slot id="hw-thumb-m" shape="rounded" radius="8" placeholder="Thumb" style="width:72px;height:72px;display:block;background:#F3EEEB"></image-slot></div>
+<div><div style="font-size:16px;font-weight:900;letter-spacing:-0.02em">Product Builders Summit 2027</div><div style="font-size:13px;color:#6B6B6B;margin-top:2px">Sat, 13 Feb · Bangalore Intl. Centre</div></div>
+</div>
+<sc-if value="{{ filling }}" hint-placeholder-val="{{ true }}"><div style="align-self:flex-start;padding:4px 10px;border-radius:999px;background:#fff;border:1px solid #F3C9C5;color:#E5251B;font-size:12px;font-weight:700">Seats filling fast · {{ seatsLeft }} left</div></sc-if>
+<div style="border-top:1px solid #EDE6E3;padding-top:12px;display:flex;flex-direction:column;gap:8px;font-size:14px">
+<div style="display:flex;justify-content:space-between"><span>{{ lineL }}</span><span>{{ lineA }}</span></div>
+<div style="display:flex;justify-content:space-between;color:#6B6B6B"><span>Booking fee</span><span>{{ feeA }}</span></div>
+<div style="display:flex;justify-content:space-between;font-weight:900;font-size:16px;padding-top:8px;border-top:1px solid #EDE6E3"><span>Total</span><span>{{ totalA }}</span></div>
+</div>
+</div>
+</sc-if>
+</div>
+</sc-if>
+<div style="display:flex;gap:48px;align-items:flex-start">
+<div style="flex:1 1 0;min-width:0;max-width:720px">
+<div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">REGISTRATION</div>
+<h1 style="margin:12px 0 0;font-size:clamp(36px,5vw,52px);line-height:1;letter-spacing:-0.045em;font-weight:900">Get your ticket</h1>
+<div style="margin-top:32px;height:3px;background:#EDE6E3;border-radius:999px;overflow:hidden"><div style="height:100%;width:{{ progress }};background:#E5251B;border-radius:999px;transition:width .5s ease"></div></div>
+<div style="margin-top:14px;display:flex;gap:28px;flex-wrap:wrap">
+<sc-for list="{{ steps }}" as="s" hint-placeholder-count="3">
+<button onClick="{{ s.go }}" style="all:unset;cursor:{{ s.cursor }};display:flex;gap:8px;font-size:14px;font-weight:700;color:{{ s.color }}"><span style="color:{{ s.numColor }}">{{ s.n }}</span>{{ s.l }}</button>
+</sc-for>
+</div>
+
+<sc-if value="{{ s0 }}" hint-placeholder-val="{{ true }}">
+<section style="margin-top:40px">
+<h2 style="margin:0 0 24px;font-size:22px;font-weight:700;letter-spacing:-0.02em">Your details</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px">
+<sc-for list="{{ detailFields }}" as="f" hint-placeholder-count="4">
+<div>
+<div style="position:relative">
+<input id="hw-{{ f.key }}" inputMode="{{ f.mode }}" value="{{ f.value }}" placeholder="{{ f.label }}" onChange="{{ f.onChange }}" onFocus="{{ f.onFocus }}" onBlur="{{ f.onBlur }}" style="width:100%;height:60px;padding:24px 44px 8px 16px;border:1px solid {{ f.border }};border-radius:12px;font:inherit;font-size:16px;color:#141414;background:#fff;outline:none;box-shadow:{{ f.ring }};transition:border-color .15s,box-shadow .15s">
+<label for="hw-{{ f.key }}" style="position:absolute;left:17px;top:{{ f.labelTop }};font-size:{{ f.labelSize }};color:{{ f.labelColor }};pointer-events:none;transition:all .15s ease">{{ f.label }}</label>
+<sc-if value="{{ f.ok }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" style="position:absolute;right:16px;top:21px"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#141414" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+</div>
+<sc-if value="{{ f.hasErr }}" hint-placeholder-val="{{ false }}"><div style="margin:6px 0 0 4px;font-size:13px;color:#C8372D">{{ f.err }}</div></sc-if>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:32px;display:flex;justify-content:flex-end">
+<button onClick="{{ next0 }}" style="all:unset;cursor:pointer;height:54px;padding:0 32px;border-radius:999px;color:#fff;font-weight:700;font-size:16px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">Continue to tickets →</button>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ s1 }}" hint-placeholder-val="{{ false }}">
+<section style="margin-top:40px">
+<h2 style="margin:0 0 24px;font-size:22px;font-weight:700;letter-spacing:-0.02em">Choose a ticket</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,190px),1fr));gap:14px">
+<sc-for list="{{ tickets }}" as="t" hint-placeholder-count="3">
+<button onClick="{{ t.select }}" style="all:unset;cursor:pointer;position:relative;padding:22px;border:1px solid {{ t.border }};box-shadow:{{ t.ring }};border-radius:12px;background:#fff;display:flex;flex-direction:column;gap:6px;transition:transform .2s ease,border-color .15s" style-hover="transform:translateY(-2px)">
+<sc-if value="{{ t.on }}" hint-placeholder-val="{{ false }}"><span style="position:absolute;top:16px;right:16px;width:22px;height:22px;border-radius:999px;background:#E5251B;display:flex;align-items:center;justify-content:center"><svg width="12" height="12" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"></path></svg></span></sc-if>
+<span style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#6B6B6B">{{ t.name }}</span>
+<span style="font-size:28px;font-weight:900;letter-spacing:-0.03em">{{ t.priceL }}</span>
+<span style="font-size:14px;color:#6B6B6B;line-height:1.4">{{ t.note }}</span>
+</button>
+</sc-for>
+</div>
+<div style="margin-top:24px;padding:18px 22px;border:1px solid #EDE6E3;border-radius:12px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+<div><div style="font-size:16px;font-weight:700">Quantity</div><div style="font-size:14px;color:#6B6B6B;margin-top:2px">Up to 10 per booking</div></div>
+<div style="display:flex;align-items:center;gap:6px;border:1px solid #EDE6E3;border-radius:999px;padding:4px">
+<button onClick="{{ dec }}" aria-label="Decrease" style="all:unset;cursor:pointer;width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;opacity:{{ decOp }}" style-hover="background:#FAF7F5">−</button>
+<span style="min-width:72px;text-align:center;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">{{ qty }} {{ unit }}</span>
+<button onClick="{{ inc }}" aria-label="Increase" style="all:unset;cursor:pointer;width:40px;height:40px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;opacity:{{ incOp }}" style-hover="background:#FAF7F5">+</button>
+</div>
+</div>
+<div style="margin-top:32px;display:flex;justify-content:space-between;align-items:center;gap:16px">
+<button onClick="{{ back }}" style="all:unset;cursor:pointer;font-size:15px;font-weight:700;color:#6B6B6B" style-hover="color:#141414">← Back</button>
+<button onClick="{{ next1 }}" style="all:unset;cursor:pointer;height:54px;padding:0 32px;border-radius:999px;color:#fff;font-weight:700;font-size:16px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">Continue to payment →</button>
+</div>
+</section>
+</sc-if>
+
+<sc-if value="{{ s2 }}" hint-placeholder-val="{{ false }}">
+<section style="margin-top:40px">
+<h2 style="margin:0 0 24px;font-size:22px;font-weight:700;letter-spacing:-0.02em">Payment</h2>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:14px">
+<sc-for list="{{ payOpts }}" as="p" hint-placeholder-count="2">
+<button onClick="{{ p.select }}" style="all:unset;cursor:pointer;padding:20px 22px;border:1px solid {{ p.border }};box-shadow:{{ p.ring }};border-radius:12px;display:flex;gap:16px;align-items:center;transition:transform .2s ease" style-hover="transform:translateY(-2px)">
+<span style="flex:none;width:20px;height:20px;border-radius:999px;border:1.5px solid {{ p.dotBorder }};display:flex;align-items:center;justify-content:center"><span style="width:10px;height:10px;border-radius:999px;background:#E5251B;transform:{{ p.dot }};transition:transform .2s ease"></span></span>
+<span style="display:flex;flex-direction:column;gap:2px"><span style="font-size:16px;font-weight:700">{{ p.l }}</span><span style="font-size:14px;color:#6B6B6B">{{ p.d }}</span></span>
+</button>
+</sc-for>
+</div>
+<sc-if value="{{ isUpi }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:20px">
+<sc-for list="{{ upiFields }}" as="f" hint-placeholder-count="1">
+<div>
+<div style="position:relative">
+<input id="hw-{{ f.key }}" inputMode="{{ f.mode }}" value="{{ f.value }}" placeholder="{{ f.label }}" onChange="{{ f.onChange }}" onFocus="{{ f.onFocus }}" onBlur="{{ f.onBlur }}" style="width:100%;height:60px;padding:24px 44px 8px 16px;border:1px solid {{ f.border }};border-radius:12px;font:inherit;font-size:16px;color:#141414;background:#fff;outline:none;box-shadow:{{ f.ring }};transition:border-color .15s,box-shadow .15s">
+<label for="hw-{{ f.key }}" style="position:absolute;left:17px;top:{{ f.labelTop }};font-size:{{ f.labelSize }};color:{{ f.labelColor }};pointer-events:none;transition:all .15s ease">{{ f.label }}</label>
+<sc-if value="{{ f.ok }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" style="position:absolute;right:16px;top:21px"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#141414" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+</div>
+<sc-if value="{{ f.hasErr }}" hint-placeholder-val="{{ false }}"><div style="margin:6px 0 0 4px;font-size:13px;color:#C8372D">{{ f.err }}</div></sc-if>
+</div>
+</sc-for>
+<div style="margin-top:10px;font-size:13px;color:#6B6B6B">You'll get a payment request in your UPI app.</div>
+</div>
+</sc-if>
+<sc-if value="{{ isCard }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:20px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));gap:16px">
+<sc-for list="{{ cardFields }}" as="f" hint-placeholder-count="3">
+<div>
+<div style="position:relative">
+<input id="hw-{{ f.key }}" inputMode="{{ f.mode }}" value="{{ f.value }}" placeholder="{{ f.label }}" onChange="{{ f.onChange }}" onFocus="{{ f.onFocus }}" onBlur="{{ f.onBlur }}" style="width:100%;height:60px;padding:24px 44px 8px 16px;border:1px solid {{ f.border }};border-radius:12px;font:inherit;font-size:16px;color:#141414;background:#fff;outline:none;box-shadow:{{ f.ring }};transition:border-color .15s,box-shadow .15s">
+<label for="hw-{{ f.key }}" style="position:absolute;left:17px;top:{{ f.labelTop }};font-size:{{ f.labelSize }};color:{{ f.labelColor }};pointer-events:none;transition:all .15s ease;white-space:nowrap">{{ f.label }}</label>
+<sc-if value="{{ f.ok }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" style="position:absolute;right:16px;top:21px"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#141414" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path></svg></sc-if>
+</div>
+<sc-if value="{{ f.hasErr }}" hint-placeholder-val="{{ false }}"><div style="margin:6px 0 0 4px;font-size:13px;color:#C8372D">{{ f.err }}</div></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<div style="margin-top:32px;display:flex;justify-content:space-between;align-items:center;gap:16px">
+<button onClick="{{ back }}" style="all:unset;cursor:pointer;font-size:15px;font-weight:700;color:#6B6B6B" style-hover="color:#141414">← Back</button>
+<button onClick="{{ payNow }}" style="all:unset;cursor:pointer;height:54px;min-width:180px;justify-content:center;padding:0 32px;border-radius:999px;color:#fff;font-weight:700;font-size:16px;display:inline-flex;align-items:center;gap:10px;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">{{ spinner }}Processing…</sc-if>
+<sc-if value="{{ idle }}" hint-placeholder-val="{{ true }}">{{ payLabel }}</sc-if>
+</button>
+</div>
+<div style="margin-top:16px;font-size:13px;color:#6B6B6B;text-align:right">Secured payment · Full refund until 30 Jan 2027</div>
+</section>
+</sc-if>
+</div>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<aside style="flex:none;width:380px;position:sticky;top:24px;border:1px solid #EDE6E3;border-radius:12px;background:#FAF7F5;padding:20px">
+<div style="aspect-ratio:16/9;width:100%"><image-slot id="hw-thumb" shape="rounded" radius="8" placeholder="Event thumbnail" style="width:100%;height:100%;display:block;background:#F3EEEB"></image-slot></div>
+<div style="margin-top:18px;display:flex;justify-content:space-between;align-items:flex-start;gap:12px">
+<div style="font-size:20px;font-weight:900;letter-spacing:-0.025em;line-height:1.15">Product Builders Summit 2027</div>
+</div>
+<div style="margin-top:8px;font-size:14px;color:#6B6B6B;line-height:1.5">Sat, 13 Feb 2027 · 9:30 AM<br>Bangalore International Centre</div>
+<sc-if value="{{ filling }}" hint-placeholder-val="{{ true }}"><div style="margin-top:14px;display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;background:#fff;border:1px solid #F3C9C5;color:#E5251B;font-size:12px;font-weight:700"><span style="width:6px;height:6px;border-radius:999px;background:#E5251B"></span>Seats filling fast · {{ seatsLeft }} left</div></sc-if>
+<div style="margin-top:20px;padding-top:16px;border-top:1px solid #EDE6E3;display:flex;flex-direction:column;gap:10px;font-size:15px">
+<div style="display:flex;justify-content:space-between;gap:12px"><span>{{ lineL }}</span><span style="font-variant-numeric:tabular-nums">{{ lineA }}</span></div>
+<div style="display:flex;justify-content:space-between;gap:12px;color:#6B6B6B"><span>Booking fee</span><span style="font-variant-numeric:tabular-nums">{{ feeA }}</span></div>
+</div>
+<div style="margin-top:16px;padding-top:16px;border-top:1px solid #EDE6E3;display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">TOTAL</span><span style="font-size:26px;font-weight:900;letter-spacing:-0.02em;font-variant-numeric:tabular-nums">{{ totalA }}</span></div>
+</aside>
+</sc-if>
+</div>
+</main>
+</sc-if>
+<sc-if value="{{ done }}" hint-placeholder-val="{{ false }}">
+<main style="max-width:640px;margin:0 auto;padding:64px 24px 96px;display:flex;flex-direction:column;align-items:center;text-align:center">
+<div style="width:96px;height:96px;border-radius:999px;background:#E5251B;display:flex;align-items:center;justify-content:center;animation:hwPop .5s cubic-bezier(.2,.9,.3,1.2) both"><svg width="44" height="44" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+<h1 style="margin:28px 0 0;font-size:clamp(48px,8vw,72px);line-height:.95;letter-spacing:-0.05em;font-weight:900">You're in!</h1>
+<p style="margin:14px 0 0;font-size:17px;color:#6B6B6B;line-height:1.5">Your ticket has been sent to <span style="color:#141414;font-weight:500">{{ email }}</span></p>
+<div style="margin-top:40px;width:100%;border:1px solid #EDE6E3;border-radius:12px;background:#fff;text-align:left;overflow:hidden">
+<div style="padding:24px 28px">
+<div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#E5251B">E-TICKET</div>
+<div style="margin-top:8px;font-size:24px;font-weight:900;letter-spacing:-0.03em">Product Builders Summit 2027</div>
+<div style="margin-top:4px;font-size:14px;color:#6B6B6B">Sat, 13 Feb 2027 · 9:30 AM · Bangalore International Centre</div>
+<div style="margin-top:22px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:16px">
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">ATTENDEE</div><div style="margin-top:4px;font-size:15px;font-weight:700">{{ who }}</div></div>
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">TICKET</div><div style="margin-top:4px;font-size:15px;font-weight:700">{{ ticketName }} × {{ qtyL }}</div></div>
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">BOOKING ID</div><div style="margin-top:4px;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">{{ ticketId }}</div></div>
+</div>
+</div>
+<div style="position:relative;height:0;border-top:1px dashed #EDE6E3">
+<span style="position:absolute;left:-11px;top:-11px;width:22px;height:22px;border-radius:999px;background:#fff;border:1px solid #EDE6E3"></span>
+<span style="position:absolute;right:-11px;top:-11px;width:22px;height:22px;border-radius:999px;background:#fff;border:1px solid #EDE6E3"></span>
+</div>
+<div style="padding:24px 28px;background:#FAF7F5;display:flex;align-items:center;gap:24px;flex-wrap:wrap">
+<div style="width:132px;height:132px;padding:10px;background:#fff;border:1px solid #EDE6E3;border-radius:8px"><svg viewBox="0 0 29 29" shape-rendering="crispEdges" style="width:100%;height:100%;display:block"><path d="{{ qr }}" fill="#141414"></path></svg></div>
+<div style="flex:1 1 200px;font-size:14px;color:#6B6B6B;line-height:1.5">Show this code at the entrance. Each person in your booking gets their own code by email.</div>
+</div>
+</div>
+<div style="margin-top:28px;display:flex;gap:12px;flex-wrap:wrap;justify-content:center">
+<button onClick="{{ addCal }}" style="all:unset;cursor:pointer;height:52px;padding:0 28px;border-radius:999px;color:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">Add to calendar</button>
+<button onClick="{{ download }}" style="all:unset;cursor:pointer;height:52px;padding:0 28px;border-radius:999px;border:1px solid #141414;box-sizing:border-box;color:#141414;font-weight:700;font-size:15px;display:inline-flex;align-items:center;transition:background .2s" style-hover="background:#FAF7F5">{{ dlLabel }}</button>
+</div>
+<a href="Heatwave Event.dc.html" style="margin-top:28px;font-size:14px;font-weight:700;color:#6B6B6B">Back to event page</a>
+</main>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startStep&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;details&quot;,&quot;tickets&quot;,&quot;payment&quot;,&quot;success&quot;],&quot;default&quot;:&quot;details&quot;,&quot;tsType&quot;:&quot;string&quot;},&quot;seatsLeft&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:42,&quot;min&quot;:0,&quot;max&quot;:500,&quot;tsType&quot;:&quot;number&quot;}}">
+const TICKETS = [
+  { id: 'early', name: 'Early bird', price: 999, note: '18 left at this price', min: 1 },
+  { id: 'regular', name: 'Regular', price: 1499, note: 'Full-day access, meals included', min: 1 },
+  { id: 'group', name: 'Group', price: 1199, note: 'Per person, 4 or more', min: 4 }
+];
+const RULES = {
+  name: v => v.trim().length < 2 ? 'Enter your full name' : '',
+  email: v => /^\S+@\S+\.\S+$/.test(v) ? '' : 'Enter a valid email address',
+  phone: v => v.replace(/\D/g, '').length === 10 ? '' : 'Enter a 10-digit mobile number',
+  org: v => v.trim() ? '' : 'Add your college or organisation',
+  upi: v => /^[\w.-]{2,}@[a-z]{2,}$/i.test(v) ? '' : 'Enter a UPI ID like name@okaxis',
+  cardnum: v => v.replace(/\D/g, '').length === 16 ? '' : 'Enter the 16-digit card number',
+  exp: v => /^(0[1-9]|1[0-2])\/\d{2}$/.test(v) ? '' : 'Use MM/YY',
+  cvv: v => /^\d{3}$/.test(v) ? '' : 'Enter 3 digits'
+};
+const MASK = {
+  phone: v => v.replace(/\D/g, '').slice(0, 10),
+  cardnum: v => v.replace(/\D/g, '').slice(0, 16).replace(/(\d{4})(?=\d)/g, '$1 '),
+  exp: v => { const d = v.replace(/\D/g, '').slice(0, 4); return d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d; },
+  cvv: v => v.replace(/\D/g, '').slice(0, 3)
+};
+const fmt = n => '₹' + n.toLocaleString('en-IN');
+
+class Component extends DCLogic {
+  state = { step: this.props.startStep === 'success' ? 3 : 0, values: {}, touched: {}, focus: null, ticket: 'regular', qty: 1,
+    pay: 'upi', loading: false, sumOpen: false, narrow: false, saved: false };
+  componentDidMount() {
+    this.onResize = () => { const n = window.innerWidth < 920; if (n !== this.state.narrow) this.setState({ narrow: n }); };
+    window.addEventListener('resize', this.onResize); this.onResize();
+    if (this.props.startStep && this.props.startStep !== 'success') this.setState({ step: { details: 0, tickets: 1, payment: 2 }[this.props.startStep] ?? 0 });
+  }
+  componentDidUpdate(pp) {
+    if (pp.startStep !== this.props.startStep) this.setState({ step: { details: 0, tickets: 1, payment: 2, success: 3 }[this.props.startStep] ?? 0 });
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); }
+  field(key, label, mode = 'text') {
+    const v = this.state.values[key] || '', f = this.state.focus === key, up = f || !!v;
+    const err = this.state.touched[key] ? RULES[key](v) : '';
+    return {
+      key, label, mode, value: v, err, hasErr: !!err, ok: !err && !!this.state.touched[key] && !f && !!v,
+      border: err || f ? '#E5251B' : '#EDE6E3', ring: f ? '0 0 0 3px rgba(229,37,27,.12)' : 'none',
+      labelTop: up ? '9px' : '19px', labelSize: up ? '12px' : '16px', labelColor: err ? '#C8372D' : f ? '#E5251B' : '#6B6B6B',
+      onChange: e => { const val = MASK[key] ? MASK[key](e.target.value) : e.target.value; this.setState(s => ({ values: { ...s.values, [key]: val } })); },
+      onFocus: () => this.setState({ focus: key }),
+      onBlur: () => this.setState(s => ({ focus: null, touched: { ...s.touched, [key]: true } }))
+    };
+  }
+  check(keys) {
+    this.setState(s => ({ touched: { ...s.touched, ...Object.fromEntries(keys.map(k => [k, true])) } }));
+    return keys.every(k => !RULES[k](this.state.values[k] || ''));
+  }
+  go(step) { this.setState({ step }); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  qr() {
+    if (this._qr) return this._qr;
+    const N = 29; let s = 9, d = '';
+    const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+    for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+      const ox = x < 8 ? 0 : x >= N - 8 ? N - 7 : null, oy = y < 8 ? 0 : y >= N - 8 ? N - 7 : null;
+      const inFinder = ox !== null && oy !== null && !(ox && oy);
+      let dark;
+      if (inFinder) {
+        const fx = x - ox, fy = y - oy;
+        dark = fx >= 0 && fy >= 0 && fx < 7 && fy < 7 && (fx === 0 || fx === 6 || fy === 0 || fy === 6 || (fx > 1 && fx < 5 && fy > 1 && fy < 5));
+      } else dark = r() < 0.47;
+      if (dark) d += `M${x} ${y}h1v1h-1z`;
+    }
+    return (this._qr = d);
+  }
+  ics() {
+    const t = 'BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:Product Builders Summit 2027\nDTSTART:20270213T040000Z\nDTEND:20270213T123000Z\nLOCATION:Bangalore International Centre, Domlur, Bengaluru\nEND:VEVENT\nEND:VCALENDAR';
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([t], { type: 'text/calendar' })); a.download = 'heatwave-summit.ics'; a.click();
+  }
+  renderVals() {
+    const st = this.state, t = TICKETS.find(x => x.id === st.ticket), seats = this.props.seatsLeft ?? 42;
+    const sub = t.price * st.qty, fee = 49, total = sub + fee;
+    const pick = id => () => this.setState(s => ({ ticket: id, qty: Math.max(s.qty, TICKETS.find(x => x.id === id).min) }));
+    return {
+      wide: !st.narrow, narrow: st.narrow, sumOpen: st.sumOpen, sumArrow: st.sumOpen ? 'rotate(180deg)' : 'none',
+      toggleSum: () => this.setState(s => ({ sumOpen: !s.sumOpen })),
+      inForm: st.step < 3, done: st.step === 3, s0: st.step === 0, s1: st.step === 1, s2: st.step === 2,
+      progress: ((Math.min(st.step, 2) + 1) / 3 * 100) + '%',
+      steps: ['Details', 'Tickets', 'Payment'].map((l, i) => ({ n: '0' + (i + 1), l, color: i <= st.step ? '#141414' : '#6B6B6B',
+        numColor: i <= st.step ? '#E5251B' : '#6B6B6B', cursor: i < st.step ? 'pointer' : 'default', go: () => i < st.step && this.go(i) })),
+      detailFields: [this.field('name', 'Full name'), this.field('email', 'Email', 'email'), this.field('phone', 'Phone (+91)', 'tel'), this.field('org', 'College or organisation')],
+      upiFields: [this.field('upi', 'UPI ID')],
+      cardFields: [this.field('cardnum', 'Card number', 'numeric'), this.field('exp', 'Expiry (MM/YY)', 'numeric'), this.field('cvv', 'CVV', 'numeric')],
+      tickets: TICKETS.map(x => { const on = x.id === st.ticket; return { ...x, priceL: fmt(x.price), on, select: pick(x.id),
+        border: on ? '#E5251B' : '#EDE6E3', ring: on ? '0 0 0 1px #E5251B' : 'none' }; }),
+      qty: st.qty, unit: st.ticket === 'group' ? 'people' : (st.qty === 1 ? 'ticket' : 'tickets'),
+      decOp: st.qty > t.min ? 1 : 0.35, incOp: st.qty < 10 ? 1 : 0.35,
+      dec: () => this.setState(s => ({ qty: Math.max(t.min, s.qty - 1) })), inc: () => this.setState(s => ({ qty: Math.min(10, s.qty + 1) })),
+      payOpts: [{ id: 'upi', l: 'UPI', d: 'GPay, PhonePe, Paytm or any UPI app' }, { id: 'card', l: 'Card', d: 'Visa, Mastercard, RuPay' }].map(p => {
+        const on = st.pay === p.id; return { ...p, border: on ? '#E5251B' : '#EDE6E3', ring: on ? '0 0 0 1px #E5251B' : 'none',
+          dot: on ? 'scale(1)' : 'scale(0)', dotBorder: on ? '#E5251B' : '#C9C0BC', select: () => this.setState({ pay: p.id }) }; }),
+      isUpi: st.pay === 'upi', isCard: st.pay === 'card',
+      next0: () => this.check(['name', 'email', 'phone', 'org']) && this.go(1),
+      next1: () => this.go(2), back: () => this.go(st.step - 1),
+      payNow: () => { if (st.loading) return; if (!this.check(st.pay === 'upi' ? ['upi'] : ['cardnum', 'exp', 'cvv'])) return;
+        this.setState({ loading: true }); setTimeout(() => { this.setState({ loading: false }); this.go(3); }, 1700); },
+      loading: st.loading, idle: !st.loading, payLabel: 'Pay ' + fmt(total),
+      spinner: React.createElement('span', { style: { width: 18, height: 18, borderRadius: 999, border: '2px solid rgba(255,255,255,.35)', borderTopColor: '#fff', animation: 'hwSpin .7s linear infinite', display: 'inline-block' } }),
+      lineL: `${t.name} × ${st.qty}`, lineA: fmt(sub), feeA: fmt(fee), totalA: fmt(total), filling: seats < 60, seatsLeft: seats,
+      who: st.values.name || 'Aarav Sharma', email: st.values.email || 'aarav@example.com', ticketName: t.name, qtyL: String(st.qty),
+      ticketId: 'HW-27-' + (4821 + st.qty * 7), qr: this.qr(),
+      addCal: () => this.ics(), download: () => { this.setState({ saved: true }); setTimeout(() => this.setState({ saved: false }), 2200); },
+      dlLabel: st.saved ? 'Saved ✓' : 'Download ticket'
+    };
+  }
+}
+</script>
+</body>
+</html>

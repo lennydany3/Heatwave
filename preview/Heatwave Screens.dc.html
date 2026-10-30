@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&amp;display=swap">
+<style>
+body{margin:0;background:#F3EEEB;color:#141414;font-family:Satoshi,system-ui,sans-serif}
+a{color:#141414;text-decoration:none}a:hover{color:#E5251B}
+</style>
+</helmet>
+<div style="padding:56px 64px;display:flex;flex-direction:column;gap:72px">
+<div>
+<div style="font-weight:900;font-size:28px;letter-spacing:-0.04em;display:flex;align-items:center;gap:8px">heatwave<span style="width:9px;height:9px;border-radius:999px;background:#E5251B"></span></div>
+<p style="margin:10px 0 0;font-size:16px;color:#6B6B6B;max-width:70ch">All screens at desktop (1280px) and mobile (390px). Each frame is live: click through, or open a screen on its own from its title.</p>
+</div>
+<sc-for list="{{ screens }}" as="s" hint-placeholder-count="7">
+<section id="{{ s.id }}" style="display:flex;flex-direction:column;gap:18px">
+<div style="display:flex;align-items:baseline;gap:14px"><span style="font:600 11px ui-monospace,Menlo,monospace;padding:3px 8px;background:#141414;color:#fff;border-radius:4px">{{ s.n }}</span><a href="{{ s.file }}" style="font-size:22px;font-weight:900;letter-spacing:-0.02em">{{ s.title }}</a><span style="font-size:14px;color:#6B6B6B">{{ s.note }}</span></div>
+<div style="display:flex;gap:40px;align-items:flex-start">
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12px;font-weight:700;letter-spacing:0.12em;color:#6B6B6B">DESKTOP</span><iframe src="{{ s.file }}" loading="lazy" title="{{ s.title }} desktop" style="width:1280px;height:820px;border:1px solid #EDE6E3;border-radius:12px;background:#fff;display:block"></iframe></div>
+<div style="display:flex;flex-direction:column;gap:8px"><span style="font-size:12px;font-weight:700;letter-spacing:0.12em;color:#6B6B6B">MOBILE</span><iframe src="{{ s.file }}" loading="lazy" title="{{ s.title }} mobile" style="width:390px;height:844px;border:1px solid #EDE6E3;border-radius:28px;background:#fff;display:block"></iframe></div>
+</div>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return { screens: [
+      ['Customer Login.dc.html', 'Customer login', 'Leads to dashboard. Try a short password for the error state.'],
+      ['Customer Dashboard.dc.html', 'Customer dashboard', 'Next-up ticket, tabs, ticket detail, cancel flow'],
+      ['Admin Login.dc.html', 'Admin login', 'Optional 2FA code'],
+      ['Admin Overview.dc.html', 'Admin overview', 'KPIs, bookings chart, recent bookings table'],
+      ['Admin Events.dc.html', 'Admin events', 'List, create/edit form, unpublish confirm'],
+      ['Admin Check-in.dc.html', 'Attendees & check-in', 'Scanner, live counter, CSV export'],
+      ['Admin Payments.dc.html', 'Payments', 'Transactions, status filter, refunds']
+    ].map(([file, title, note], i) => ({ id: 's' + (i + 1), n: String(i + 1).padStart(2, '0'), file, title, note })) };
+  }
+}
+</script>
+</body>
+</html>

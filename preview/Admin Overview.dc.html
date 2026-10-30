@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&amp;display=swap">
+<style>
+body{margin:0;background:#fff;color:#141414;font-family:Satoshi,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#141414;text-decoration:none}a:hover{color:#E5251B}
+*{box-sizing:border-box}
+input::placeholder{color:#6B6B6B}
+@keyframes hwUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+@keyframes hwPulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes hwIn{from{transform:translateX(-100%)}to{transform:none}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex">
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<aside style="flex:none;width:240px;height:100vh;position:sticky;top:0;border-right:1px solid #EDE6E3;background:#FAF7F5;display:flex;flex-direction:column;padding:22px 14px">
+<div style="padding:0 10px 24px;display:flex;align-items:center;gap:10px"><span style="font-weight:900;font-size:19px;letter-spacing:-0.04em;display:flex;align-items:center;gap:6px">heatwave<span style="width:7px;height:7px;border-radius:999px;background:#E5251B"></span></span><span style="font-size:10px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">ADMIN</span></div>
+<nav style="display:flex;flex-direction:column;gap:2px">
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="7">
+<a href="{{ n.href }}" style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:700;background:{{ n.bg }};color:{{ n.color }};transition:background .2s" style-hover="background:#fff;color:#141414"><span style="width:6px;height:6px;border-radius:999px;background:{{ n.dot }}"></span>{{ n.l }}</a>
+</sc-for>
+</nav>
+<div style="margin-top:auto;padding:14px 12px;border-top:1px solid #EDE6E3;font-size:13px;color:#6B6B6B">Signed in as<br><span style="color:#141414;font-weight:700">Lakshmi Venkatesh</span></div>
+</aside>
+</sc-if>
+<sc-if value="{{ drawer }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ closeDrawer }}" style="position:fixed;inset:0;z-index:60;background:rgba(20,20,20,.36)">
+<aside onClick="{{ stop }}" style="width:272px;height:100%;background:#FAF7F5;border-right:1px solid #EDE6E3;padding:22px 14px;animation:hwIn .25s ease both;display:flex;flex-direction:column;gap:2px">
+<div style="padding:0 10px 24px;font-weight:900;font-size:19px;letter-spacing:-0.04em">heatwave <span style="font-size:10px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">ADMIN</span></div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="7">
+<a href="{{ n.href }}" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:10px;font-size:15px;font-weight:700;background:{{ n.bg }};color:{{ n.color }}"><span style="width:6px;height:6px;border-radius:999px;background:{{ n.dot }}"></span>{{ n.l }}</a>
+</sc-for>
+<a href="Admin Login.dc.html" style="margin-top:auto;padding:12px;font-size:14px;font-weight:700;color:#E5251B">Log out</a>
+</aside>
+</div>
+</sc-if>
+<div style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="position:sticky;top:0;z-index:20;background:rgba(255,255,255,.96);backdrop-filter:blur(8px);border-bottom:1px solid #EDE6E3">
+<div style="padding:14px clamp(16px,3vw,32px);display:flex;align-items:center;gap:14px">
+<sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}"><button onClick="{{ openDrawer }}" aria-label="Menu" style="all:unset;cursor:pointer;width:40px;height:40px;border-radius:999px;border:1px solid #EDE6E3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px"><span style="width:16px;height:1.5px;background:#141414"></span><span style="width:16px;height:1.5px;background:#141414"></span><span style="width:16px;height:1.5px;background:#141414"></span></button></sc-if>
+<div style="flex:1;min-width:0;max-width:420px;position:relative"><input value="{{ q }}" onChange="{{ onQ }}" placeholder="Search bookings, attendees, events" style="width:100%;height:42px;padding:0 16px 0 38px;border:1px solid #EDE6E3;border-radius:999px;font:inherit;font-size:14px;outline:none;background:#fff" style-focus="border-color:#E5251B;box-shadow:0 0 0 3px rgba(229,37,27,.12)"><span style="position:absolute;left:15px;top:13px;width:12px;height:12px;border:1.5px solid #6B6B6B;border-radius:999px"></span></div>
+<a href="Admin Events.dc.html?create=1" style="margin-left:auto;flex:none;height:42px;padding:0 20px;border-radius:999px;color:#fff;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease;white-space:nowrap" style-hover="background-position:0 0;color:#fff">+ {{ createLabel }}</a>
+<span style="flex:none;width:40px;height:40px;border-radius:999px;background:#141414;color:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">LV</span>
+</div>
+</header>
+<main style="padding:clamp(20px,3vw,40px) clamp(16px,3vw,32px) 64px;max-width:1280px;width:100%">
+<div style="display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px">
+<div><div style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">OVERVIEW</div><h1 style="margin:8px 0 0;font-size:clamp(30px,3.4vw,40px);letter-spacing:-0.04em;font-weight:900;line-height:1">Good morning, Lakshmi</h1></div>
+<div style="font-size:14px;color:#6B6B6B">Sat, 30 Jan 2027 · Updated 2 min ago</div>
+</div>
+<div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px">
+<sc-for list="{{ kpis }}" as="k" hint-placeholder-count="4">
+<div style="border:1px solid #EDE6E3;border-radius:12px;padding:20px 22px;background:#fff;transition:transform .25s ease;animation:hwUp .5s ease both" style-hover="transform:translateY(-2px)">
+<div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">{{ k.label }}</div>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}"><div style="margin-top:14px;height:30px;width:60%;border-radius:8px;background:#F3EEEB;animation:hwPulse 1.4s ease infinite"></div></sc-if>
+<sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}"><div style="margin-top:10px;font-size:32px;font-weight:900;letter-spacing:-0.035em;font-variant-numeric:tabular-nums">{{ k.value }}</div></sc-if>
+<div style="margin-top:8px;display:flex;align-items:center;gap:8px;font-size:13px;color:#6B6B6B"><span style="padding:2px 8px;border-radius:999px;background:{{ k.tBg }};color:{{ k.tFg }};font-weight:700">{{ k.trend }}</span>{{ k.note }}</div>
+</div>
+</sc-for>
+</div>
+<div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:20px;align-items:stretch">
+<div style="flex:2 1 520px;min-width:0;border:1px solid #EDE6E3;border-radius:12px;padding:22px 24px">
+<div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+<div><div style="font-size:17px;font-weight:700">Bookings over time</div><div style="margin-top:2px;font-size:13px;color:#6B6B6B">{{ chartTotal }} bookings in this period</div></div>
+<div style="display:flex;padding:3px;border:1px solid #EDE6E3;border-radius:999px;gap:2px">
+<sc-for list="{{ ranges }}" as="r" hint-placeholder-count="3"><button onClick="{{ r.pick }}" style="all:unset;cursor:pointer;padding:6px 14px;border-radius:999px;font-size:13px;font-weight:700;background:{{ r.bg }};color:{{ r.fg }};transition:background .2s,color .2s">{{ r.l }}</button></sc-for>
+</div>
+</div>
+<div style="margin-top:20px;position:relative;height:220px">
+<div style="position:absolute;inset:0;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none"><span style="border-top:1px solid #EDE6E3"></span><span style="border-top:1px solid #EDE6E3"></span><span style="border-top:1px solid #EDE6E3"></span><span style="border-top:1px solid #EDE6E3"></span></div>
+<svg viewBox="0 0 600 200" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;overflow:visible"><path d="{{ area }}" fill="#FDECEA" opacity="0.6"></path><path d="{{ line }}" fill="none" stroke="#E5251B" stroke-width="2" vector-effect="non-scaling-stroke" stroke-linejoin="round"></path></svg>
+<div style="position:absolute;right:-5px;top:{{ lastY }};width:10px;height:10px;margin-top:-5px;border-radius:999px;background:#E5251B;box-shadow:0 0 0 4px #fff"></div>
+</div>
+<div style="margin-top:10px;display:flex;justify-content:space-between;font-size:12px;color:#6B6B6B"><span>{{ x0 }}</span><span>{{ x1 }}</span><span>Today</span></div>
+</div>
+<div style="flex:1 1 300px;min-width:0;border:1px solid #EDE6E3;border-radius:12px;padding:22px 24px">
+<div style="font-size:17px;font-weight:700">Top events by sales</div>
+<div style="margin-top:18px;display:flex;flex-direction:column;gap:18px">
+<sc-for list="{{ top }}" as="t" hint-placeholder-count="5">
+<div><div style="display:flex;justify-content:space-between;gap:12px;font-size:14px"><span style="font-weight:700">{{ t.name }}</span><span style="font-variant-numeric:tabular-nums">{{ t.rev }}</span></div>
+<div style="margin-top:8px;height:4px;border-radius:999px;background:#F3EEEB;overflow:hidden"><div style="height:100%;width:{{ t.w }};background:{{ t.c }};border-radius:999px;transition:width .6s ease"></div></div></div>
+</sc-for>
+</div>
+</div>
+</div>
+<section id="bookings" style="margin-top:20px;border:1px solid #EDE6E3;border-radius:12px;scroll-margin-top:90px">
+<div style="padding:20px 24px;display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:14px">
+<div style="font-size:17px;font-weight:700">Recent bookings</div>
+<div style="display:flex;flex-wrap:wrap;gap:6px">
+<sc-for list="{{ filters }}" as="f" hint-placeholder-count="5"><button onClick="{{ f.pick }}" style="all:unset;cursor:pointer;padding:6px 14px;border-radius:999px;border:1px solid {{ f.bd }};font-size:13px;font-weight:700;background:{{ f.bg }};color:{{ f.fg }}">{{ f.l }}</button></sc-for>
+</div>
+</div>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,.6fr) 44px;gap:16px;padding:12px 24px;background:#FAF7F5;border-top:1px solid #EDE6E3;border-bottom:1px solid #EDE6E3">
+<sc-for list="{{ cols }}" as="c" hint-placeholder-count="6"><button onClick="{{ c.sort }}" style="all:unset;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:0.12em;color:{{ c.fg }};display:flex;gap:6px;align-items:center;text-align:{{ c.align }};justify-content:{{ c.just }}">{{ c.l }}<span style="color:#E5251B">{{ c.arrow }}</span></button></sc-for>
+<span></span>
+</div>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<sc-for list="{{ skel }}" as="k" hint-placeholder-count="5"><div style="padding:18px 24px;border-bottom:1px solid #EDE6E3;display:flex;gap:16px;animation:hwPulse 1.4s ease infinite"><div style="height:12px;width:22%;border-radius:999px;background:#F3EEEB"></div><div style="height:12px;width:28%;border-radius:999px;background:#F3EEEB"></div><div style="height:12px;width:12%;border-radius:999px;background:#F3EEEB"></div></div></sc-for>
+</sc-if>
+<sc-if value="{{ ready }}" hint-placeholder-val="{{ true }}">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="6">
+<div style="position:relative;display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1.6fr) minmax(0,.9fr) minmax(0,.8fr) minmax(0,.9fr) minmax(0,.6fr) 44px;gap:16px;align-items:center;padding:14px 24px;border-bottom:1px solid #EDE6E3;font-size:14px;transition:background .15s" style-hover="background:#FCFAF9">
+<div style="min-width:0"><div style="font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name }}</div><div style="font-size:12px;color:#6B6B6B">{{ r.id }}</div></div>
+<div style="min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.event }}</div>
+<div style="color:#6B6B6B">{{ r.type }} × {{ r.qty }}</div>
+<div style="text-align:right;font-variant-numeric:tabular-nums;font-weight:700">{{ r.amt }}</div>
+<div><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:{{ r.bBg }};color:{{ r.bFg }};font-size:12px;font-weight:700;white-space:nowrap"><span style="width:6px;height:6px;border-radius:999px;background:{{ r.bDot }}"></span>{{ r.status }}</span></div>
+<div style="color:#6B6B6B">{{ r.date }}</div>
+<button onClick="{{ r.toggle }}" aria-label="Row actions" style="all:unset;cursor:pointer;width:32px;height:32px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:18px;color:#6B6B6B;letter-spacing:1px" style-hover="background:#FAF7F5;color:#141414">⋯</button>
+<sc-if value="{{ r.menuOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:24px;top:52px;z-index:10;width:180px;background:#fff;border:1px solid #EDE6E3;border-radius:12px;padding:6px;box-shadow:0 8px 24px rgba(20,20,20,.06);animation:hwUp .15s ease both">
+<button onClick="{{ r.viewB }}" style="all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;padding:9px 12px;border-radius:8px;font-size:14px" style-hover="background:#FAF7F5">View booking</button>
+<button onClick="{{ r.resend }}" style="all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;padding:9px 12px;border-radius:8px;font-size:14px" style-hover="background:#FAF7F5">Resend ticket</button>
+<sc-if value="{{ r.canRefund }}" hint-placeholder-val="{{ true }}"><button onClick="{{ r.askRefund }}" style="all:unset;cursor:pointer;box-sizing:border-box;display:block;width:100%;padding:9px 12px;border-radius:8px;font-size:14px;color:#B71C14" style-hover="background:#FDECEA">Refund</button></sc-if>
+</div>
+</sc-if>
+</div>
+</sc-for>
+</sc-if>
+</sc-if>
+<sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+<div style="border-top:1px solid #EDE6E3">
+<sc-for list="{{ rows }}" as="r" hint-placeholder-count="4">
+<div style="padding:16px 20px;border-bottom:1px solid #EDE6E3;display:flex;flex-direction:column;gap:8px">
+<div style="display:flex;justify-content:space-between;gap:12px;align-items:center"><span style="font-weight:700;font-size:15px">{{ r.name }}</span><span style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:{{ r.bBg }};color:{{ r.bFg }};font-size:12px;font-weight:700"><span style="width:6px;height:6px;border-radius:999px;background:{{ r.bDot }}"></span>{{ r.status }}</span></div>
+<div style="font-size:14px;color:#6B6B6B">{{ r.event }} · {{ r.type }} × {{ r.qty }}</div>
+<div style="display:flex;justify-content:space-between;font-size:13px;color:#6B6B6B"><span>{{ r.id }} · {{ r.date }}</span><span style="font-weight:700;color:#141414;font-size:14px">{{ r.amt }}</span></div>
+<sc-if value="{{ r.canRefund }}" hint-placeholder-val="{{ false }}"><button onClick="{{ r.askRefund }}" style="all:unset;cursor:pointer;align-self:flex-start;font-size:13px;font-weight:700;color:#B71C14">Refund</button></sc-if>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+<div style="padding:56px 24px;text-align:center;border-top:1px solid #EDE6E3"><div style="font-size:18px;font-weight:700">No bookings match</div><div style="margin-top:6px;font-size:14px;color:#6B6B6B">Try a different search or clear the status filter.</div><button onClick="{{ clearFilters }}" style="all:unset;cursor:pointer;margin-top:16px;font-size:14px;font-weight:700;color:#E5251B">Clear filters</button></div>
+</sc-if>
+<div style="padding:14px 24px;display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13px;color:#6B6B6B;flex-wrap:wrap">
+<span>{{ rangeText }}</span>
+<div style="display:flex;gap:6px">
+<button onClick="{{ prev }}" style="all:unset;cursor:pointer;height:34px;padding:0 14px;border-radius:999px;border:1px solid #EDE6E3;font-weight:700;color:#141414;opacity:{{ prevOp }}">← Prev</button>
+<button onClick="{{ next }}" style="all:unset;cursor:pointer;height:34px;padding:0 14px;border-radius:999px;border:1px solid #EDE6E3;font-weight:700;color:#141414;opacity:{{ nextOp }}">Next →</button>
+</div>
+</div>
+</section>
+</main>
+</div>
+<sc-if value="{{ hasRefund }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ cancelRefund }}" style="position:fixed;inset:0;z-index:70;background:rgba(20,20,20,.36);display:flex;align-items:center;justify-content:center;padding:24px">
+<div onClick="{{ stop }}" style="width:100%;max-width:420px;background:#fff;border-radius:12px;padding:28px;animation:hwUp .25s ease both">
+<div style="font-size:22px;font-weight:900;letter-spacing:-0.025em">Refund {{ rf.amt }}?</div>
+<p style="margin:10px 0 0;font-size:15px;line-height:1.55;color:#6B6B6B">{{ rf.name }}'s booking {{ rf.id }} for {{ rf.event }} will be cancelled and the amount returned to the original payment method.</p>
+<div style="margin-top:24px;display:flex;justify-content:flex-end;gap:10px"><button onClick="{{ cancelRefund }}" style="all:unset;cursor:pointer;height:44px;padding:0 20px;border-radius:999px;border:1px solid #EDE6E3;font-size:14px;font-weight:700">Keep booking</button><button onClick="{{ doRefund }}" style="all:unset;cursor:pointer;height:44px;padding:0 20px;border-radius:999px;background:#B71C14;color:#fff;font-size:14px;font-weight:700">Refund</button></div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:80;background:#141414;color:#fff;padding:12px 20px;border-radius:999px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;animation:hwUp .3s ease both;white-space:nowrap"><span style="width:6px;height:6px;border-radius:999px;background:#6FBF8A"></span>{{ toastMsg }}</div>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+const PAGE = 'overview';
+const NAV = [['overview', 'Overview', 'Admin Overview.dc.html'], ['events', 'Events', 'Admin Events.dc.html'], ['bookings', 'Bookings', 'Admin Overview.dc.html#bookings'],
+  ['attendees', 'Attendees', 'Admin Check-in.dc.html'], ['checkin', 'Check-in', 'Admin Check-in.dc.html'], ['payments', 'Payments', 'Admin Payments.dc.html'], ['settings', 'Settings', '#']];
+const EVENTS = ['Bay Beats Festival', 'Chennai Product Summit', 'Carnatic Fusion Night', 'Marina Sunrise 10K', 'Stand-up Sunday', 'Coffee & Code Meetup'];
+const NAMES = ['Karthik Subramanian', 'Divya Natarajan', 'Arun Kumar', 'Meenakshi Iyer', 'Vignesh Ramesh', 'Revathi Balaji', 'Sanjay Krishnan', 'Harish Chandran', 'Priya Raghavan', 'Anitha Selvam', 'Gokul Prakash', 'Nandhini Murali', 'Rahul Shankar', 'Swetha Sundar', 'Bharath Mohan', 'Keerthana Ravi', 'Aravind Pillai', 'Janani Ganesh'];
+const TYPES = [['GA Pass', 1799], ['Regular', 1499], ['Balcony', 600], ['Runner', 899], ['Regular', 499], ['Free', 0]];
+const STATUSES = ['Confirmed', 'Confirmed', 'Pending', 'Confirmed', 'Checked-in', 'Cancelled', 'Confirmed'];
+const BADGE = { 'Confirmed': ['#EEF4EF', '#2F6B45', '#3F8A5A'], 'Pending': ['#FAF7F5', '#6B6B6B', '#B5ADA9'], 'Cancelled': ['#FDECEA', '#B71C14', '#E5251B'], 'Checked-in': ['#141414', '#FFFFFF', '#FFFFFF'] };
+const fmt = n => '₹' + n.toLocaleString('en-IN');
+const BOOKINGS = NAMES.map((name, i) => { const e = i % 6, qty = 1 + (i * 7) % 3, st = STATUSES[i % 7];
+  return { id: 'HW-27-' + (6120 - i * 13), name, event: EVENTS[e], type: TYPES[e][0], qty, amount: TYPES[e][1] * qty, status: st, day: 30 - Math.floor(i * 1.6), date: (30 - Math.floor(i * 1.6)) + ' Jan' }; });
+const series = n => Array.from({ length: n }, (_, i) => Math.round(90 + 40 * Math.sin(i / (n / 6)) + 25 * Math.sin(i * 1.7) + i * (120 / n) + ((i * 37) % 11) * 3));
+
+class Component extends DCLogic {
+  state = { narrow: false, drawer: false, q: '', range: '30D', loading: true, sort: 'day', dir: -1, filter: 'All', page: 0, menu: null, refund: null, toast: '', refunded: {} };
+  componentDidMount() {
+    this.onResize = () => { const n = window.innerWidth < 980; if (n !== this.state.narrow) this.setState({ narrow: n }); };
+    window.addEventListener('resize', this.onResize); this.onResize();
+    this.t = setTimeout(() => this.setState({ loading: false }), 900);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); clearTimeout(this.t); clearTimeout(this.tt); }
+  toast(m) { clearTimeout(this.tt); this.setState({ toast: m }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  shell() {
+    const s = this.state;
+    return { wide: !s.narrow, narrow: s.narrow, drawer: s.drawer && s.narrow, openDrawer: () => this.setState({ drawer: true }), closeDrawer: () => this.setState({ drawer: false }), stop: e => e.stopPropagation(),
+      nav: NAV.map(([id, l, href]) => ({ l, href, bg: id === PAGE ? '#fff' : 'transparent', color: id === PAGE ? '#141414' : '#6B6B6B', dot: id === PAGE ? '#E5251B' : 'transparent' })),
+      q: s.q, onQ: e => this.setState({ q: e.target.value, page: 0 }), createLabel: s.narrow ? 'New' : 'Create event',
+      hasToast: !!s.toast, toastMsg: s.toast };
+  }
+  table() {
+    const s = this.state, PER = 6, q = s.q.trim().toLowerCase();
+    let rows = BOOKINGS.map(b => ({ ...b, status: s.refunded[b.id] ? 'Cancelled' : b.status }))
+      .filter(b => (s.filter === 'All' || b.status === s.filter) && (!q || (b.name + b.event + b.id).toLowerCase().includes(q)));
+    const k = s.sort; rows.sort((a, b) => (a[k] > b[k] ? 1 : a[k] < b[k] ? -1 : 0) * s.dir);
+    const total = rows.length, pages = Math.max(1, Math.ceil(total / PER)), page = Math.min(s.page, pages - 1);
+    const view = rows.slice(page * PER, page * PER + PER).map(r => { const b = BADGE[r.status];
+      return { ...r, amt: r.amount ? fmt(r.amount) : 'Free', bBg: b[0], bFg: b[1], bDot: b[2], menuOpen: s.menu === r.id, canRefund: (r.status === 'Confirmed' || r.status === 'Pending') && r.amount > 0,
+        toggle: () => this.setState(x => ({ menu: x.menu === r.id ? null : r.id })),
+        viewB: () => { this.setState({ menu: null }); this.toast('Opening ' + r.id); },
+        resend: () => { this.setState({ menu: null }); this.toast('Ticket resent to ' + r.name.split(' ')[0]); },
+        askRefund: () => this.setState({ menu: null, refund: r.id }) }; });
+    const rf = s.refund ? BOOKINGS.find(b => b.id === s.refund) : null;
+    const cols = [['name', 'ATTENDEE'], ['event', 'EVENT'], ['type', 'TICKET'], ['amount', 'AMOUNT'], ['status', 'STATUS'], ['day', 'DATE']];
+    return {
+      filters: ['All', 'Confirmed', 'Pending', 'Checked-in', 'Cancelled'].map(l => { const on = s.filter === l;
+        return { l, bg: on ? '#141414' : '#fff', fg: on ? '#fff' : '#6B6B6B', bd: on ? '#141414' : '#EDE6E3', pick: () => this.setState({ filter: l, page: 0 }) }; }),
+      cols: cols.map(([id, l]) => ({ l, fg: s.sort === id ? '#141414' : '#6B6B6B', arrow: s.sort === id ? (s.dir > 0 ? '↑' : '↓') : '', align: id === 'amount' ? 'right' : 'left', just: id === 'amount' ? 'flex-end' : 'flex-start',
+        sort: () => this.setState(x => ({ sort: id, dir: x.sort === id ? -x.dir : 1 })) })),
+      rows: view, noRows: total === 0 && !s.loading, skel: [1, 2, 3, 4, 5],
+      rangeText: total ? `Showing ${page * PER + 1}–${Math.min(total, page * PER + PER)} of ${total}` : 'No results',
+      prevOp: page > 0 ? 1 : 0.4, nextOp: page < pages - 1 ? 1 : 0.4,
+      prev: () => page > 0 && this.setState({ page: page - 1 }), next: () => page < pages - 1 && this.setState({ page: page + 1 }),
+      clearFilters: () => this.setState({ filter: 'All', q: '' }),
+      hasRefund: !!rf, rf: rf ? { ...rf, amt: fmt(rf.amount) } : {}, cancelRefund: () => this.setState({ refund: null }),
+      doRefund: () => { const id = s.refund; this.setState(x => ({ refunded: { ...x.refunded, [id]: true }, refund: null })); this.toast('Refund of ' + fmt(rf.amount) + ' started'); }
+    };
+  }
+  renderVals() {
+    const s = this.state;
+    const n = { '7D': 7, '30D': 30, '90D': 90 }[s.range], d = series(90).slice(90 - n), max = Math.max(...d) * 1.1;
+    const pts = d.map((v, i) => [i / (n - 1) * 600, 200 - v / max * 200]);
+    const line = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
+    const lab = k => { const dt = new Date(2027, 0, 30 - k); return dt.getDate() + ' ' + dt.toLocaleString('en', { month: 'short' }); };
+    const up = ['#EEF4EF', '#2F6B45'], flat = ['#FAF7F5', '#6B6B6B'];
+    const top = [['Bay Beats Festival', 742000], ['Chennai Product Summit', 486500], ['Marina Sunrise 10K', 301200], ['Carnatic Fusion Night', 188400], ['Stand-up Sunday', 124500]];
+    return { ...this.shell(), loading: s.loading, ready: !s.loading,
+      kpis: [
+        { label: 'TOTAL REVENUE', value: '₹18,42,600', trend: '↑ 12.4%', note: 'vs last 30 days', tBg: up[0], tFg: up[1] },
+        { label: 'TICKETS SOLD', value: '3,284', trend: '↑ 8.1%', note: 'vs last 30 days', tBg: up[0], tFg: up[1] },
+        { label: 'ACTIVE EVENTS', value: '6', trend: '0', note: '2 go live next week', tBg: flat[0], tFg: flat[1] },
+        { label: 'CHECK-INS TODAY', value: '412', trend: '36%', note: 'of 1,150 expected', tBg: '#FDECEA', tFg: '#B71C14' }
+      ],
+      ranges: ['7D', '30D', '90D'].map(l => ({ l, bg: s.range === l ? '#141414' : 'transparent', fg: s.range === l ? '#fff' : '#6B6B6B', pick: () => this.setState({ range: l }) })),
+      line, area: line + ' L600 200 L0 200 Z', lastY: (pts[n - 1][1] / 2) + '%', chartTotal: d.reduce((a, b) => a + b, 0).toLocaleString('en-IN'),
+      x0: lab(n - 1), x1: lab(Math.round(n / 2)),
+      ...this.table(),
+      top: top.map(([name, r], i) => ({ name, rev: fmt(r), w: (r / top[0][1] * 100) + '%', c: i === 0 ? '#E5251B' : '#141414' }))
+    };
+  }
+}
+</script>
+</body>
+</html>

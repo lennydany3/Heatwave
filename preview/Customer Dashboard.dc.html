@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,700,900&amp;display=swap">
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:#fff;color:#141414;font-family:Satoshi,system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#141414;text-decoration:none}a:hover{color:#E5251B}
+*{box-sizing:border-box}
+@keyframes hwUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+@keyframes hwPulse{0%,100%{opacity:1}50%{opacity:.45}}
+@keyframes hwDrift{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+</style>
+</helmet>
+<div style="min-height:100vh;padding-bottom:{{ bottomPad }}">
+<header style="border-bottom:1px solid #EDE6E3;background:#fff;position:sticky;top:0;z-index:20">
+<div style="max-width:1200px;margin:0 auto;padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px">
+<a href="#" style="font-weight:900;font-size:20px;letter-spacing:-0.04em;display:flex;align-items:center;gap:6px">heatwave<span style="width:7px;height:7px;border-radius:999px;background:#E5251B"></span></a>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<nav style="display:flex;gap:6px;font-size:14px;font-weight:700">
+<a href="#" style="padding:8px 16px;border-radius:999px;background:#FDECEA;color:#E5251B">My Tickets</a>
+<a href="Heatwave Event.dc.html" style="padding:8px 16px;border-radius:999px;color:#6B6B6B">Events</a>
+<a href="#" style="padding:8px 16px;border-radius:999px;color:#6B6B6B">Profile</a>
+</nav>
+</sc-if>
+<div style="position:relative">
+<button onClick="{{ toggleMenu }}" style="all:unset;cursor:pointer;display:flex;align-items:center;gap:10px">
+<span style="width:38px;height:38px;border-radius:999px;background:#141414;color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700">PR</span>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span style="font-size:12px;color:#6B6B6B">▼</span></sc-if>
+</button>
+<sc-if value="{{ menuOpen }}" hint-placeholder-val="{{ false }}">
+<div style="position:absolute;right:0;top:48px;width:220px;background:#fff;border:1px solid #EDE6E3;border-radius:12px;padding:8px;box-shadow:0 8px 24px rgba(20,20,20,.06);animation:hwUp .2s ease both">
+<div style="padding:10px 12px 12px;border-bottom:1px solid #EDE6E3;margin-bottom:6px"><div style="font-size:15px;font-weight:700">Priya Raghavan</div><div style="font-size:13px;color:#6B6B6B">priya.r@example.com</div></div>
+<a href="#" style="display:block;padding:10px 12px;border-radius:8px;font-size:14px" style-hover="background:#FAF7F5">Profile settings</a>
+<a href="Customer Login.dc.html" style="display:block;padding:10px 12px;border-radius:8px;font-size:14px;color:#E5251B" style-hover="background:#FDECEA">Log out</a>
+</div>
+</sc-if>
+</div>
+</div>
+</header>
+<main style="max-width:1200px;margin:0 auto;padding:48px 24px 96px">
+<div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:20px;animation:hwUp .5s ease both">
+<div>
+<h1 style="margin:0;font-size:clamp(40px,6vw,64px);line-height:1;letter-spacing:-0.05em;font-weight:900">Hi, Priya</h1>
+<p style="margin:10px 0 0;font-size:17px;color:#6B6B6B">{{ subtitle }}</p>
+</div>
+<a href="Heatwave Event.dc.html" style="height:46px;padding:0 22px;border-radius:999px;border:1px solid #141414;display:inline-flex;align-items:center;font-size:15px;font-weight:700;transition:background .2s" style-hover="background:#FAF7F5;color:#141414">Browse events</a>
+</div>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:40px;height:280px;border:1px solid #EDE6E3;border-radius:12px;background:#FAF7F5;animation:hwPulse 1.4s ease infinite"></div>
+</sc-if>
+<sc-if value="{{ hasHl }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:40px;font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">NEXT UP · {{ hl.when }}</div>
+<div style="margin-top:14px;display:flex;flex-direction:{{ hlDir }};border:1px solid #EDE6E3;border-radius:12px;background:#fff;overflow:hidden;animation:hwUp .5s .1s ease both">
+<div style="flex:1 1 0;min-width:0;display:flex">
+<div style="flex:none;width:6px;background:#E5251B"></div>
+<div style="flex:1;min-width:0;padding:clamp(22px,3vw,36px)">
+<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+<span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ hl.bBg }};color:{{ hl.bFg }};font-size:12px;font-weight:700"><span style="width:6px;height:6px;border-radius:999px;background:{{ hl.bDot }}"></span>{{ hl.status }}</span>
+<span style="font-size:13px;color:#6B6B6B">{{ hl.bid }}</span>
+</div>
+<h2 style="margin:16px 0 0;font-size:clamp(32px,4.4vw,52px);line-height:1;letter-spacing:-0.045em;font-weight:900">{{ hl.title }}</h2>
+<div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:20px 24px">
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">DATE</div><div style="margin-top:5px;font-size:16px;font-weight:700">{{ hl.date }}</div></div>
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">TIME</div><div style="margin-top:5px;font-size:16px;font-weight:700">{{ hl.time }}</div></div>
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">VENUE</div><div style="margin-top:5px;font-size:16px;font-weight:700">{{ hl.venue }}</div></div>
+<div><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">TICKET</div><div style="margin-top:5px;font-size:16px;font-weight:700">{{ hl.type }} · {{ hl.qtyL }}</div></div>
+</div>
+<div style="margin-top:32px;display:flex;flex-wrap:wrap;gap:10px">
+<button onClick="{{ hl.view }}" style="all:unset;cursor:pointer;height:48px;padding:0 26px;border-radius:999px;color:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">View ticket</button>
+<button onClick="{{ hl.cal }}" style="all:unset;cursor:pointer;height:48px;padding:0 22px;border-radius:999px;border:1px solid #EDE6E3;box-sizing:border-box;font-weight:700;font-size:15px;display:inline-flex;align-items:center" style-hover="background:#FAF7F5">Add to calendar</button>
+<button onClick="{{ hl.dirs }}" style="all:unset;cursor:pointer;height:48px;padding:0 22px;border-radius:999px;border:1px solid #EDE6E3;box-sizing:border-box;font-weight:700;font-size:15px;display:inline-flex;align-items:center" style-hover="background:#FAF7F5">Get directions</button>
+</div>
+</div>
+</div>
+<div style="position:relative;flex:none;width:{{ stubW }};background:#FAF7F5;border-left:{{ perfL }};border-top:{{ perfT }};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:28px">
+<span style="position:absolute;left:-12px;top:-12px;width:22px;height:22px;border-radius:999px;background:#fff;border:1px solid #EDE6E3"></span>
+<span style="position:absolute;left:{{ n2l }};right:{{ n2r }};top:{{ n2t }};bottom:{{ n2b }};width:22px;height:22px;border-radius:999px;background:#fff;border:1px solid #EDE6E3"></span>
+<div style="width:160px;height:160px;padding:12px;background:#fff;border:1px solid #EDE6E3;border-radius:8px"><svg viewBox="0 0 29 29" shape-rendering="crispEdges" style="width:100%;height:100%;display:block"><path d="{{ hlQr }}" fill="#141414"></path></svg></div>
+<div style="font-size:12px;color:#6B6B6B;text-align:center">Scan at entry</div>
+</div>
+</div>
+</sc-if>
+<div style="margin-top:56px;display:flex;gap:28px;border-bottom:1px solid #EDE6E3">
+<sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+<button onClick="{{ t.pick }}" style="all:unset;cursor:pointer;padding:0 0 14px;margin-bottom:-1px;border-bottom:2px solid {{ t.bar }};font-size:16px;font-weight:700;color:{{ t.color }};display:flex;gap:8px;align-items:center;transition:color .2s,border-color .25s">{{ t.l }}<span style="font-size:12px;color:#6B6B6B;font-weight:500">{{ t.n }}</span></button>
+</sc-for>
+</div>
+<sc-if value="{{ loading }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:20px">
+<sc-for list="{{ skeletons }}" as="k" hint-placeholder-count="3">
+<div style="border:1px solid #EDE6E3;border-radius:12px;overflow:hidden;animation:hwPulse 1.4s ease infinite">
+<div style="aspect-ratio:16/9;background:#FAF7F5"></div>
+<div style="padding:18px;display:flex;flex-direction:column;gap:10px"><div style="height:12px;width:40%;border-radius:999px;background:#F3EEEB"></div><div style="height:18px;width:80%;border-radius:999px;background:#F3EEEB"></div><div style="height:12px;width:60%;border-radius:999px;background:#F3EEEB"></div></div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ hasCards }}" hint-placeholder-val="{{ true }}">
+<div style="margin-top:28px;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:20px">
+<sc-for list="{{ cards }}" as="c" hint-placeholder-count="3">
+<div style="border:1px solid #EDE6E3;border-radius:12px;overflow:hidden;background:#fff;transition:transform .25s ease;animation:hwUp .5s ease both" style-hover="transform:translateY(-3px)">
+<div style="aspect-ratio:16/9;position:relative"><image-slot id="cd-thumb-{{ c.id }}" shape="rect" placeholder="Event image" style="width:100%;height:100%;display:block;background:#FAF7F5"></image-slot>
+<span style="position:absolute;top:12px;left:12px;display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ c.bBg }};color:{{ c.bFg }};font-size:12px;font-weight:700;pointer-events:none"><span style="width:6px;height:6px;border-radius:999px;background:{{ c.bDot }}"></span>{{ c.status }}</span></div>
+<div style="padding:18px 20px 20px">
+<div style="font-size:13px;color:#6B6B6B">{{ c.date }} · {{ c.time }}</div>
+<div style="margin-top:6px;font-size:19px;font-weight:900;letter-spacing:-0.02em">{{ c.title }}</div>
+<div style="margin-top:4px;font-size:14px;color:#6B6B6B">{{ c.type }} · {{ c.qtyL }}</div>
+<div style="margin-top:18px;padding-top:14px;border-top:1px solid #EDE6E3;display:flex;justify-content:space-between;align-items:center;gap:12px">
+<span style="font-size:12px;color:#6B6B6B;font-variant-numeric:tabular-nums">{{ c.bid }}</span>
+<span style="display:flex;gap:16px"><button onClick="{{ c.view }}" style="all:unset;cursor:pointer;font-size:14px;font-weight:700;color:#E5251B" style-hover="color:#B71C14">View</button><button onClick="{{ c.download }}" style="all:unset;cursor:pointer;font-size:14px;font-weight:700" style-hover="color:#E5251B">Download</button></span>
+</div>
+</div>
+</div>
+</sc-for>
+</div>
+</sc-if>
+<sc-if value="{{ isEmpty }}" hint-placeholder-val="{{ false }}">
+<div style="margin-top:28px;padding:64px 24px;border:1px solid #EDE6E3;border-radius:12px;background:#FAF7F5;display:flex;flex-direction:column;align-items:center;text-align:center;animation:hwUp .5s ease both">
+<div style="width:220px;height:48px;overflow:hidden">{{ wave }}</div>
+<div style="margin-top:20px;font-size:26px;font-weight:900;letter-spacing:-0.03em">{{ emptyTitle }}</div>
+<div style="margin-top:8px;font-size:16px;color:#6B6B6B">{{ emptyBody }}</div>
+<a href="Heatwave Event.dc.html" style="margin-top:24px;height:48px;padding:0 26px;border-radius:999px;color:#fff;font-weight:700;font-size:15px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0;color:#fff">Explore events</a>
+</div>
+</sc-if>
+</main>
+<sc-if value="{{ modal }}" hint-placeholder-val="{{ false }}">
+<div onClick="{{ close }}" style="position:fixed;inset:0;z-index:50;background:rgba(20,20,20,.36);display:flex;align-items:{{ mAlign }};justify-content:center;padding:{{ mPad }}">
+<div onClick="{{ stop }}" style="width:100%;max-width:820px;max-height:{{ mMaxH }};overflow:auto;background:#fff;border-radius:{{ mRadius }};animation:hwUp .3s ease both">
+<div style="padding:20px 24px;border-bottom:1px solid #EDE6E3;display:flex;justify-content:space-between;align-items:center;gap:16px">
+<div style="display:flex;align-items:center;gap:10px"><span style="font-size:12px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">TICKET</span><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:{{ m.bBg }};color:{{ m.bFg }};font-size:12px;font-weight:700"><span style="width:6px;height:6px;border-radius:999px;background:{{ m.bDot }}"></span>{{ m.status }}</span></div>
+<button onClick="{{ close }}" aria-label="Close" style="all:unset;cursor:pointer;width:36px;height:36px;border-radius:999px;display:flex;align-items:center;justify-content:center;font-size:20px;color:#6B6B6B" style-hover="background:#FAF7F5;color:#141414">×</button>
+</div>
+<div style="display:flex;flex-wrap:wrap">
+<div style="flex:1 1 280px;padding:28px;background:#FAF7F5;display:flex;flex-direction:column;align-items:center;gap:16px;border-right:1px solid #EDE6E3">
+<div style="width:100%;max-width:240px;aspect-ratio:1/1;padding:16px;background:#fff;border:1px solid #EDE6E3;border-radius:12px"><svg viewBox="0 0 29 29" shape-rendering="crispEdges" style="width:100%;height:100%;display:block"><path d="{{ mQr }}" fill="#141414"></path></svg></div>
+<div style="text-align:center"><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">BOOKING ID</div><div style="margin-top:4px;font-size:18px;font-weight:900;letter-spacing:0.02em;font-variant-numeric:tabular-nums">{{ m.bid }}</div></div>
+<div style="text-align:center"><div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">ATTENDEE</div><div style="margin-top:4px;font-size:16px;font-weight:700">Priya Raghavan</div></div>
+</div>
+<div style="flex:1.4 1 320px;padding:28px;display:flex;flex-direction:column;gap:22px">
+<div>
+<div style="font-size:28px;font-weight:900;letter-spacing:-0.035em;line-height:1.05">{{ m.title }}</div>
+<div style="margin-top:8px;font-size:15px;color:#6B6B6B;line-height:1.5">{{ m.date }} · {{ m.time }}<br>{{ m.venue }}, {{ m.area }}</div>
+</div>
+<div style="border:1px solid #EDE6E3;border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;font-size:15px">
+<div style="font-size:11px;font-weight:700;letter-spacing:0.14em;color:#6B6B6B">PAYMENT</div>
+<div style="display:flex;justify-content:space-between"><span>{{ m.type }} × {{ m.qty }}</span><span>{{ m.total }}</span></div>
+<div style="display:flex;justify-content:space-between;color:#6B6B6B"><span>Booking fee</span><span>{{ m.fee }}</span></div>
+<div style="display:flex;justify-content:space-between;padding-top:10px;border-top:1px solid #EDE6E3;font-weight:900"><span>Paid via UPI</span><span>{{ m.grand }}</span></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px">
+<button onClick="{{ m.download }}" style="all:unset;cursor:pointer;height:46px;padding:0 22px;border-radius:999px;color:#fff;font-weight:700;font-size:14px;display:inline-flex;align-items:center;background:linear-gradient(90deg,#B71C14 50%,#E5251B 50%);background-size:202% 100%;background-position:100% 0;transition:background-position .4s ease" style-hover="background-position:0 0">Download PDF</button>
+<button onClick="{{ m.cal }}" style="all:unset;cursor:pointer;height:46px;padding:0 20px;border-radius:999px;border:1px solid #EDE6E3;box-sizing:border-box;font-weight:700;font-size:14px;display:inline-flex;align-items:center" style-hover="background:#FAF7F5">Add to calendar</button>
+<button onClick="{{ share }}" style="all:unset;cursor:pointer;height:46px;padding:0 20px;border-radius:999px;border:1px solid #EDE6E3;box-sizing:border-box;font-weight:700;font-size:14px;display:inline-flex;align-items:center" style-hover="background:#FAF7F5">Share</button>
+</div>
+<sc-if value="{{ m.canCancel }}" hint-placeholder-val="{{ true }}">
+<sc-if value="{{ notConfirm }}" hint-placeholder-val="{{ true }}"><button onClick="{{ askCancel }}" style="all:unset;cursor:pointer;align-self:flex-start;font-size:13px;color:#6B6B6B;text-decoration:underline;text-underline-offset:3px" style-hover="color:#B71C14">Cancel booking</button></sc-if>
+<sc-if value="{{ confirm }}" hint-placeholder-val="{{ false }}">
+<div style="padding:16px 18px;border-radius:12px;background:#FDECEA;display:flex;flex-direction:column;gap:12px">
+<div style="font-size:15px;font-weight:700;color:#141414">Cancel this booking?</div>
+<div style="font-size:14px;color:#6B6B6B;line-height:1.5">{{ m.grand }} will be refunded to your UPI account in 5–7 working days. This can't be undone.</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap"><button onClick="{{ keep }}" style="all:unset;cursor:pointer;height:40px;padding:0 18px;border-radius:999px;background:#fff;border:1px solid #EDE6E3;box-sizing:border-box;font-size:14px;font-weight:700;display:inline-flex;align-items:center">Keep booking</button><button onClick="{{ doCancel }}" style="all:unset;cursor:pointer;height:40px;padding:0 18px;border-radius:999px;background:#B71C14;color:#fff;font-size:14px;font-weight:700;display:inline-flex;align-items:center">Yes, cancel</button></div>
+</div>
+</sc-if>
+</sc-if>
+</div>
+</div>
+</div>
+</div>
+</sc-if>
+<sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+<div style="position:fixed;left:50%;bottom:{{ toastBottom }};transform:translateX(-50%);z-index:60;background:#141414;color:#fff;padding:12px 20px;border-radius:999px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:10px;animation:hwUp .3s ease both;white-space:nowrap"><span style="width:6px;height:6px;border-radius:999px;background:#6FBF8A"></span>{{ toastMsg }}</div>
+</sc-if>
+<sc-if value="{{ narrow }}" hint-placeholder-val="{{ false }}">
+<nav style="position:fixed;left:0;right:0;bottom:0;z-index:30;background:#fff;border-top:1px solid #EDE6E3;display:grid;grid-template-columns:repeat(3,1fr);padding:8px 8px 14px">
+<a href="#" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;font-size:12px;font-weight:700;color:#E5251B"><span style="width:22px;height:16px;border:2px solid currentColor;border-radius:4px"></span>Tickets</a>
+<a href="Heatwave Event.dc.html" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;font-size:12px;font-weight:700;color:#6B6B6B"><span style="width:18px;height:18px;border:2px solid currentColor;border-radius:999px"></span>Events</a>
+<a href="#" style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px;font-size:12px;font-weight:700;color:#6B6B6B"><span style="width:18px;height:18px;border:2px solid currentColor;border-radius:999px 999px 6px 6px"></span>Profile</a>
+</nav>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;empty&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+const TICKETS = [
+  { id: 1, title: 'Bay Beats Festival', date: 'Sat, 6 Mar 2027', time: '4:00 PM', venue: 'Chennai Trade Centre', area: 'Nandambakkam, Chennai', type: 'GA Pass', qty: 2, price: 1799, bid: 'HW-27-5103', status: 'Confirmed', tab: 'upcoming', when: 'in 12 days' },
+  { id: 2, title: 'Chennai Product Summit', date: 'Fri, 19 Mar 2027', time: '9:30 AM', venue: 'IIT Madras Research Park', area: 'Taramani, Chennai', type: 'Regular', qty: 1, price: 1499, bid: 'HW-27-5288', status: 'Confirmed', tab: 'upcoming' },
+  { id: 3, title: 'Carnatic Fusion Night', date: 'Sun, 28 Mar 2027', time: '7:00 PM', venue: 'The Music Academy', area: 'Royapettah, Chennai', type: 'Balcony', qty: 2, price: 600, bid: 'HW-27-5412', status: 'Pending', tab: 'upcoming' },
+  { id: 4, title: 'Marina Sunrise 10K', date: 'Sun, 11 Apr 2027', time: '5:30 AM', venue: 'Marina Beach, Lighthouse', area: 'Mylapore, Chennai', type: 'Runner', qty: 1, price: 899, bid: 'HW-27-5530', status: 'Confirmed', tab: 'upcoming' },
+  { id: 5, title: 'Coffee & Code Meetup', date: 'Sat, 12 Dec 2026', time: '10:00 AM', venue: 'Express Avenue', area: 'Royapettah, Chennai', type: 'Free', qty: 1, price: 0, bid: 'HW-26-4471', status: 'Checked-in', tab: 'past' },
+  { id: 6, title: 'Margazhi Dance Evening', date: 'Sun, 20 Dec 2026', time: '6:30 PM', venue: 'Kalakshetra Foundation', area: 'Thiruvanmiyur, Chennai', type: 'Front rows', qty: 2, price: 750, bid: 'HW-26-4519', status: 'Checked-in', tab: 'past' },
+  { id: 7, title: 'Design Leadership Breakfast', date: 'Thu, 14 Jan 2027', time: '8:00 AM', venue: 'Taj Coromandel', area: 'Nungambakkam, Chennai', type: 'Invite', qty: 1, price: 0, bid: 'HW-27-4802', status: 'Checked-in', tab: 'past' },
+  { id: 8, title: 'Stand-up Sunday', date: 'Sun, 7 Feb 2027', time: '8:00 PM', venue: 'Phoenix Marketcity', area: 'Velachery, Chennai', type: 'Regular', qty: 2, price: 499, bid: 'HW-27-4990', status: 'Cancelled', tab: 'cancelled' }
+];
+const BADGE = {
+  'Confirmed': { bg: '#EEF4EF', fg: '#2F6B45', dot: '#3F8A5A' },
+  'Pending': { bg: '#FAF7F5', fg: '#6B6B6B', dot: '#B5ADA9' },
+  'Cancelled': { bg: '#FDECEA', fg: '#B71C14', dot: '#E5251B' },
+  'Checked-in': { bg: '#141414', fg: '#FFFFFF', dot: '#FFFFFF' }
+};
+const fmt = n => n ? '₹' + n.toLocaleString('en-IN') : 'Free';
+function qrPath(seed) {
+  const N = 29; let s = seed * 7919 + 13, d = '';
+  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
+    const ox = x < 8 ? 0 : x >= N - 8 ? N - 7 : null, oy = y < 8 ? 0 : y >= N - 8 ? N - 7 : null;
+    let dark;
+    if (ox !== null && oy !== null && !(ox && oy)) { const fx = x - ox, fy = y - oy;
+      dark = fx >= 0 && fy >= 0 && fx < 7 && fy < 7 && (fx === 0 || fx === 6 || fy === 0 || fy === 6 || (fx > 1 && fx < 5 && fy > 1 && fy < 5)); }
+    else dark = r() < 0.47;
+    if (dark) d += `M${x} ${y}h1v1h-1z`;
+  }
+  return d;
+}
+
+class Component extends DCLogic {
+  state = { tab: 'upcoming', narrow: false, loading: true, menu: false, open: null, confirm: false, toast: '', cancelled: {} };
+  componentDidMount() {
+    this.onResize = () => { const n = window.innerWidth < 860; if (n !== this.state.narrow) this.setState({ narrow: n }); };
+    window.addEventListener('resize', this.onResize); this.onResize();
+    this.t = setTimeout(() => this.setState({ loading: false }), 900);
+  }
+  componentWillUnmount() { window.removeEventListener('resize', this.onResize); clearTimeout(this.t); clearTimeout(this.tt); }
+  toast(msg) { clearTimeout(this.tt); this.setState({ toast: msg }); this.tt = setTimeout(() => this.setState({ toast: '' }), 2400); }
+  ics(t) {
+    const body = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${t.title}\nLOCATION:${t.venue}, ${t.area}\nDESCRIPTION:Booking ${t.bid}\nEND:VEVENT\nEND:VCALENDAR`;
+    const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: 'text/calendar' })); a.download = t.bid + '.ics'; a.click();
+    this.toast('Calendar file downloaded');
+  }
+  deco(t) {
+    const status = this.state.cancelled[t.id] ? 'Cancelled' : t.status, b = BADGE[status];
+    return { ...t, status, bBg: b.bg, bFg: b.fg, bDot: b.dot, qtyL: t.qty + (t.qty > 1 ? ' tickets' : ' ticket'), total: fmt(t.price * t.qty),
+      unit: fmt(t.price), fee: t.price ? '₹49' : '₹0', grand: t.price ? fmt(t.price * t.qty + 49) : 'Free', canCancel: status === 'Confirmed' || status === 'Pending',
+      view: () => this.setState({ open: t.id, confirm: false }), download: () => this.toast('Ticket PDF saved · ' + t.bid),
+      cal: () => this.ics(t), dirs: () => window.open('https://maps.google.com/?q=' + encodeURIComponent(t.venue + ' Chennai'), '_blank') };
+  }
+  renderVals() {
+    const s = this.state, empty = !!this.props.empty;
+    const list = empty ? [] : TICKETS.map(t => this.deco(t)).map(t => ({ ...t, tabNow: t.status === 'Cancelled' ? 'cancelled' : t.tab }));
+    const inTab = list.filter(t => t.tabNow === s.tab);
+    const hl = s.tab === 'upcoming' ? inTab[0] : null;
+    const rest = hl ? inTab.slice(1) : inTab;
+    const cur = s.open ? this.deco(TICKETS.find(t => t.id === s.open)) : null;
+    const counts = { upcoming: 0, past: 0, cancelled: 0 }; list.forEach(t => counts[t.tabNow]++);
+    return {
+      wide: !s.narrow, narrow: s.narrow, bottomPad: s.narrow ? '76px' : '0px',
+      menuOpen: s.menu, toggleMenu: () => this.setState(x => ({ menu: !x.menu })),
+      subtitle: empty ? 'Your tickets will show up here once you book.' : `You have ${counts.upcoming} upcoming ${counts.upcoming === 1 ? 'event' : 'events'}. The next one is ${TICKETS[0].when}.`,
+      loading: s.loading, ready: !s.loading,
+      hasHl: !!hl && !s.loading, hl: hl || {}, hlQr: hl ? qrPath(hl.id) : '',
+      hlDir: s.narrow ? 'column' : 'row', stubW: s.narrow ? '100%' : '260px',
+      perfL: s.narrow ? 'none' : '1px dashed #E0D6D2', perfT: s.narrow ? '1px dashed #E0D6D2' : 'none',
+      n2l: s.narrow ? 'auto' : '-12px', n2r: s.narrow ? '-12px' : 'auto', n2t: s.narrow ? '-12px' : 'auto', n2b: s.narrow ? 'auto' : '-12px',
+      tabs: [['upcoming', 'Upcoming'], ['past', 'Past'], ['cancelled', 'Cancelled']].map(([id, l]) => ({ id, l, n: counts[id],
+        color: s.tab === id ? '#141414' : '#6B6B6B', bar: s.tab === id ? '#E5251B' : 'transparent', pick: () => this.setState({ tab: id }) })),
+      cards: rest, hasCards: rest.length > 0 && !s.loading, isEmpty: inTab.length === 0 && !s.loading,
+      emptyTitle: empty || s.tab === 'upcoming' ? 'No tickets yet' : s.tab === 'past' ? 'No past events' : 'Nothing cancelled',
+      emptyBody: empty || s.tab === 'upcoming' ? 'Find something worth going to this weekend.' : 'Events you attend or cancel will appear here.',
+      skeletons: [1, 2, 3],
+      modal: !!cur, m: cur || {}, mQr: cur ? qrPath(cur.id) : '', close: () => this.setState({ open: null }), stop: e => e.stopPropagation(),
+      confirm: s.confirm, notConfirm: !s.confirm, askCancel: () => this.setState({ confirm: true }), keep: () => this.setState({ confirm: false }),
+      doCancel: () => { this.setState(x => ({ cancelled: { ...x.cancelled, [x.open]: true }, open: null, confirm: false })); this.toast('Booking cancelled. Refund in 5–7 days.'); },
+      share: () => { navigator.clipboard && navigator.clipboard.writeText('https://heatwave.in/t/' + (cur && cur.bid)); this.toast('Ticket link copied'); },
+      mAlign: s.narrow ? 'flex-end' : 'center', mPad: s.narrow ? '0px' : '24px', mRadius: s.narrow ? '16px 16px 0 0' : '12px', mMaxH: s.narrow ? '92vh' : '90vh',
+      toastBottom: s.narrow ? '92px' : '32px',
+      hasToast: !!s.toast, toastMsg: s.toast,
+      wave: React.createElement('svg', { viewBox: '0 0 1600 80', preserveAspectRatio: 'none', style: { width: '200%', height: '100%', display: 'block', animation: 'hwDrift 22s linear infinite' } },
+        React.createElement('path', { d: 'M0 40 ' + Array.from({ length: 8 }, (_, i) => (i === 0 ? 'Q100 10 200 40 ' : 'T' + 200 * (i + 1) + ' 40 ')).join(''), fill: 'none', stroke: '#E5251B', strokeWidth: 1.5, vectorEffect: 'non-scaling-stroke' }))
+    };
+  }
+}
+</script>
+</body>
+</html>
