@@ -474,15 +474,15 @@ export default function EventPage() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 text-[13px] text-[#6B6B6B]">
           <span>© 2027 Heatwave. Event tickets made simple.</span>
           <span className="flex gap-5">
-            <Link href="#" className="text-[#6B6B6B]">
+            <Link href="/terms" className="text-[#6B6B6B] hover:text-[#141414]">
               Terms
             </Link>
-            <Link href="#" className="text-[#6B6B6B]">
+            <Link href="/privacy" className="text-[#6B6B6B] hover:text-[#141414]">
               Privacy
             </Link>
-            <Link href="#" className="text-[#6B6B6B]">
+            <a href="mailto:support@heatwave.in" className="text-[#6B6B6B] hover:text-[#141414]">
               Contact
-            </Link>
+            </a>
           </span>
         </div>
       </footer>

@@ -670,7 +670,14 @@ export default function RegisterPage() {
                   </button>
                 </div>
                 <div className="mt-4 text-right text-[13px] text-[#6B6B6B]">
-                  Secured payment via Razorpay
+                  Secured payment via Razorpay · By paying, you agree to our{" "}
+                  <Link href="/terms" className="font-bold text-[#141414] underline">
+                    Terms
+                  </Link>{" "}
+                  and{" "}
+                  <Link href="/privacy" className="font-bold text-[#141414] underline">
+                    Privacy Policy
+                  </Link>
                 </div>
               </section>
             )}
