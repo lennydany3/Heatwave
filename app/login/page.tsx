@@ -51,7 +51,7 @@ export default function LoginPage() {
     setErr("");
     setLoading(true);
     setTimeout(() => {
-      router.push("/");
+      router.push("/dashboard");
     }, 1200);
   }
 
@@ -206,7 +206,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/dashboard")}
               className="flex h-14 w-full items-center justify-center gap-3 rounded-full border border-[#EDE6E3] text-[15px] font-bold transition-colors hover:bg-[#FAF7F5]"
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EDE6E3] text-xs font-black">

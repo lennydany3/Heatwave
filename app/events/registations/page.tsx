@@ -241,7 +241,7 @@ export default function RegisterPage() {
   const [sumOpen, setSumOpen] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const qr = useMemo(buildQr, []);
+  const qr = useMemo(() => buildQr(), []);
   const t = TICKETS.find((x) => x.id === ticket)!;
   const sub = t.price * qty;
   const fee = 49;
