@@ -23,7 +23,7 @@ type RegistrationRow = {
   amount: number;
   status: "pending" | "paid" | "failed" | "cancelled";
   created_at: string;
-  razorpay_payment_id: string | null;
+  upi_txn_id: string | null;
   events: { name: string } | null;
 };
 
@@ -52,7 +52,7 @@ export default function AdminPaymentsPage() {
       const supabase = createClient();
       const { data } = await supabase
         .from("registrations")
-        .select("id, full_name, amount, status, created_at, razorpay_payment_id, events(name)")
+        .select("id, full_name, amount, status, created_at, upi_txn_id, events(name)")
         .order("created_at", { ascending: false })
         .returns<RegistrationRow[]>();
       if (cancelled) return;
@@ -65,7 +65,7 @@ export default function AdminPaymentsPage() {
             name: r.full_name,
             event: r.events?.name ?? "—",
             amount: r.amount,
-            tx: r.razorpay_payment_id ?? r.id.slice(0, 8).toUpperCase(),
+            tx: r.upi_txn_id ?? r.id.slice(0, 8).toUpperCase(),
             st: mapStatus(r.status),
             date: created.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
             time: created.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }),
@@ -105,7 +105,7 @@ export default function AdminPaymentsPage() {
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
           { l: "COLLECTED", v: fmt(collected), n: `${txns.filter((t) => t.st === "Paid").length} paid` },
-          { l: "PENDING", v: fmt(pending), n: `${txns.filter((t) => t.st === "Pending").length} in progress` },
+          { l: "PENDING", v: fmt(pending), n: `${txns.filter((t) => t.st === "Pending").length} awaiting verification` },
           { l: "FAILED", v: String(failedCount), n: "attempts" },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">

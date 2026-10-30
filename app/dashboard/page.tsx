@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createClient } from "@/utils/supabase/client";
 
-type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in";
+type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in" | "Verifying" | "Payment failed";
 type TabId = "upcoming" | "past" | "cancelled";
 
 type Ticket = {
@@ -21,6 +21,8 @@ type Ticket = {
   price: number;
   bid: string;
   status: TicketStatus;
+  note: string | null;
+  upiTxnId: string | null;
   tab: TabId;
   startsAt: string | null;
 };
@@ -30,7 +32,13 @@ type TicketRow = {
   ticket_code: string;
   status: "valid" | "checked_in" | "cancelled";
   created_at: string;
-  registrations: { amount: number; ticket_tiers: { name: string } | null } | null;
+  registrations: {
+    amount: number;
+    status: "pending" | "paid" | "failed" | "cancelled";
+    verification_note: string | null;
+    upi_txn_id: string | null;
+    ticket_tiers: { name: string } | null;
+  } | null;
   events: { name: string; venue: string | null; starts_at: string | null } | null;
 };
 
@@ -38,7 +46,29 @@ const BADGE: Record<TicketStatus, { bg: string; fg: string; dot: string }> = {
   Confirmed: { bg: "#EEF4EF", fg: "#2F6B45", dot: "#3F8A5A" },
   Cancelled: { bg: "#FDECEA", fg: "#B71C14", dot: "#E5251B" },
   "Checked-in": { bg: "#141414", fg: "#FFFFFF", dot: "#FFFFFF" },
+  Verifying: { bg: "#FFF6E5", fg: "#8A5A00", dot: "#D99A1E" },
+  "Payment failed": { bg: "#FDECEA", fg: "#B71C14", dot: "#E5251B" },
 };
+
+function PaymentNotice({ t, className = "" }: { t: Ticket; className?: string }) {
+  if (t.status === "Verifying") {
+    return (
+      <div className={`rounded-xl bg-[#FFF6E5] px-4 py-3 text-sm leading-relaxed text-[#8A5A00] ${className}`}>
+        <span className="font-bold">Payment verification pending.</span>{" "}
+        {t.note || "We're checking your UPI payment. Your QR works at the entrance once it's verified."}
+      </div>
+    );
+  }
+  if (t.status === "Payment failed") {
+    return (
+      <div className={`rounded-xl bg-[#FDECEA] px-4 py-3 text-sm leading-relaxed text-[#B71C14] ${className}`}>
+        <span className="font-bold">Payment couldn&apos;t be verified.</span>{" "}
+        {t.note || "Please contact support with your UPI transaction ID."}
+      </div>
+    );
+  }
+  return null;
+}
 
 const fmt = (n: number) => (n ? "₹" + n.toLocaleString("en-IN") : "Free");
 
@@ -125,7 +155,7 @@ export default function DashboardPage() {
       const { data } = await supabase
         .from("tickets")
         .select(
-          "id, ticket_code, status, created_at, registrations(amount, ticket_tiers(name)), events(name, venue, starts_at)"
+          "id, ticket_code, status, created_at, registrations(amount, status, verification_note, upi_txn_id, ticket_tiers(name)), events(name, venue, starts_at)"
         )
         .order("created_at", { ascending: false })
         .returns<TicketRow[]>();
@@ -135,12 +165,17 @@ export default function DashboardPage() {
       const mapped: Ticket[] = (data ?? []).map((row) => {
         const startsAt = row.events?.starts_at ?? null;
         const isPast = startsAt ? new Date(startsAt).getTime() < Date.now() : false;
+        const payment = row.registrations?.status;
         const status: TicketStatus =
-          row.status === "cancelled"
+          row.status === "cancelled" || payment === "cancelled"
             ? "Cancelled"
             : row.status === "checked_in"
               ? "Checked-in"
-              : "Confirmed";
+              : payment === "failed"
+                ? "Payment failed"
+                : payment === "paid"
+                  ? "Confirmed"
+                  : "Verifying";
         return {
           id: row.id,
           title: row.events?.name ?? "Event",
@@ -164,6 +199,8 @@ export default function DashboardPage() {
           price: row.registrations?.amount ?? 0,
           bid: row.ticket_code,
           status,
+          note: row.registrations?.verification_note ?? null,
+          upiTxnId: row.registrations?.upi_txn_id ?? null,
           tab: status === "Cancelled" ? "cancelled" : isPast ? "past" : "upcoming",
           startsAt,
         };
@@ -318,6 +355,7 @@ export default function DashboardPage() {
                       <div className="mt-1 text-base font-bold">{hl.type}</div>
                     </div>
                   </div>
+                  <PaymentNotice t={hl} className="mt-6" />
                   <div className="mt-8 flex flex-wrap gap-2.5">
                     <button
                       onClick={() => setOpen(hl.id)}
@@ -520,6 +558,7 @@ export default function DashboardPage() {
                     {cur.venue}
                   </div>
                 </div>
+                <PaymentNotice t={cur} />
                 <div className="flex flex-col gap-2.5 rounded-xl border border-[#EDE6E3] p-4.5 text-[15px]">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">PAYMENT</div>
                   <div className="flex justify-between">
@@ -527,9 +566,14 @@ export default function DashboardPage() {
                     <span>{fmt(cur.price)}</span>
                   </div>
                   <div className="flex justify-between border-t border-[#EDE6E3] pt-2.5 font-black">
-                    <span>Paid via Razorpay</span>
+                    <span>Paid via UPI</span>
                     <span>{fmt(cur.price)}</span>
                   </div>
+                  {cur.upiTxnId && (
+                    <div className="text-[13px] tabular-nums text-[#6B6B6B]">
+                      Transaction ID {cur.upiTxnId}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   <button

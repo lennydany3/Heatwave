@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import Script from "next/script";
 import { QRCodeSVG } from "qrcode.react";
 import {
   useEffect,
@@ -36,16 +35,41 @@ type EventInfo = {
 
 type TicketResult = {
   ticketCode: string;
+  tierName?: string;
   eventName?: string;
   venue?: string | null;
   startsAt?: string | null;
   amount?: number;
 };
 
-declare global {
-  interface Window {
-    Razorpay: new (options: Record<string, unknown>) => { open: () => void };
-  }
+export type ExistingRegistration = {
+  status: "pending" | "paid" | "failed";
+  ticketCode: string | null;
+  eventName: string | null;
+};
+
+const UPI_ID = process.env.NEXT_PUBLIC_UPI_ID ?? "";
+const UPI_PAYEE_NAME = process.env.NEXT_PUBLIC_UPI_PAYEE_NAME ?? "Heatwave";
+const UPI_TXN_RE = /^\d{12}$/;
+const MAX_PROOF_BYTES = 5 * 1024 * 1024;
+const PROOF_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
+const PREVIEWABLE = ["image/png", "image/jpeg", "image/webp"];
+
+const EXISTING_LABEL: Record<ExistingRegistration["status"], string> = {
+  pending: "Payment verification pending",
+  paid: "Payment verified",
+  failed: "Payment verification failed",
+};
+
+// `pa` is left unencoded: several UPI apps reject a percent-encoded "@".
+function upiLink(amount: number, note: string) {
+  return (
+    `upi://pay?pa=${UPI_ID}` +
+    `&pn=${encodeURIComponent(UPI_PAYEE_NAME)}` +
+    `&am=${amount.toFixed(2)}` +
+    `&cu=INR` +
+    `&tn=${encodeURIComponent(note)}`
+  );
 }
 
 const RULES: Record<FieldKey, (v: string) => string> = {
@@ -101,7 +125,7 @@ function EventThumb({ className = "" }: { className?: string }) {
 }
 
 type FieldProps = {
-  fieldKey: FieldKey;
+  fieldKey: string;
   label: string;
   mode?: string;
   value: string;
@@ -172,13 +196,17 @@ function Field({
   );
 }
 
-export default function RegisterPage() {
+export default function RegisterForm({
+  initialExisting,
+}: {
+  initialExisting: ExistingRegistration | null;
+}) {
   const { user } = useAuth();
 
   const [step, setStep] = useState(0);
   const [values, setValues] = useState<Partial<Record<FieldKey, string>>>({});
   const [touched, setTouched] = useState<Partial<Record<FieldKey, boolean>>>({});
-  const [focus, setFocus] = useState<FieldKey | null>(null);
+  const [focus, setFocus] = useState<FieldKey | "upiTxnId" | null>(null);
   const [gender, setGender] = useState<Gender | "">("");
   const [genderTouched, setGenderTouched] = useState(false);
 
@@ -187,10 +215,17 @@ export default function RegisterPage() {
   const [tiersLoading, setTiersLoading] = useState(true);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
 
-  const [payLoading, setPayLoading] = useState(false);
-  const [payError, setPayError] = useState("");
-  const [razorpayReady, setRazorpayReady] = useState(false);
+  const [upiTxnId, setUpiTxnId] = useState("");
+  const [txnTouched, setTxnTouched] = useState(false);
+  const [proof, setProof] = useState<File | null>(null);
+  const [proofPreview, setProofPreview] = useState("");
+  const [proofError, setProofError] = useState("");
+  const [payTouched, setPayTouched] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
+  const [existing, setExisting] = useState<ExistingRegistration | null>(initialExisting);
   const [ticketResult, setTicketResult] = useState<TicketResult | null>(null);
 
   useEffect(() => {
@@ -233,6 +268,11 @@ export default function RegisterPage() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!proofPreview) return;
+    return () => URL.revokeObjectURL(proofPreview);
+  }, [proofPreview]);
 
   function go(nextStep: number) {
     setStep(nextStep);
@@ -287,83 +327,120 @@ export default function RegisterPage() {
       ? (gender === "male" ? selectedTier.price_male : selectedTier.price_female) ?? 0
       : 0;
 
-  async function handlePay() {
-    if (payLoading || !selectedTier || !gender) return;
-    setPayError("");
-    setPayLoading(true);
+  const txnError = UPI_TXN_RE.test(upiTxnId) ? "" : "Enter the 12-digit UPI transaction ID";
+  const showTxnError = (txnTouched || payTouched) && focus !== "upiTxnId" ? txnError : "";
+  const proofMissing = payTouched && !proof ? "Upload your payment screenshot" : "";
+
+  function onProofChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!PROOF_TYPES.includes(file.type)) {
+      setProofError("Screenshot must be a PNG, JPG, WEBP or HEIC image");
+      return;
+    }
+    if (file.size > MAX_PROOF_BYTES) {
+      setProofError("Screenshot must be under 5 MB");
+      return;
+    }
+    setProofError("");
+    setProof(file);
+    setProofPreview(PREVIEWABLE.includes(file.type) ? URL.createObjectURL(file) : "");
+  }
+
+  async function copyUpiId() {
+    try {
+      await navigator.clipboard.writeText(UPI_ID);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      // Clipboard can be blocked (permissions / insecure origin); the ID is
+      // still visible on screen to copy by hand.
+    }
+  }
+
+  async function handleSubmit() {
+    if (submitting || !selectedTier || !gender) return;
+    setPayTouched(true);
+    if (txnError || !proof) return;
+    setSubmitError("");
+    setSubmitting(true);
+
+    const form = new FormData();
+    form.set("ticketTierId", selectedTier.id);
+    form.set("fullName", values.fullName ?? "");
+    form.set("email", values.email ?? "");
+    form.set("mobile", values.mobile ?? "");
+    form.set("instagram", values.instagram ?? "");
+    form.set("age", values.age ?? "");
+    form.set("gender", gender);
+    form.set("upiTxnId", upiTxnId);
+    form.set("screenshot", proof);
 
     try {
-      const res = await fetch("/api/registrations/checkout", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ticketTierId: selectedTier.id,
-          fullName: values.fullName,
-          email: values.email,
-          mobile: values.mobile,
-          instagram: values.instagram,
-          age: Number(values.age),
-          gender,
-        }),
-      });
+      const res = await fetch("/api/registrations/submit", { method: "POST", body: form });
       const data = await res.json();
       if (!res.ok) {
-        setPayError(data.error || "Could not start payment");
-        setPayLoading(false);
+        if (data.code === "already_registered") {
+          setExisting({ status: "pending", ticketCode: null, eventName: event?.name ?? null });
+          return;
+        }
+        setSubmitError(data.error || "Could not complete payment");
         return;
       }
-
-      if (!window.Razorpay) {
-        setPayError("Payment is still loading — try again in a moment.");
-        setPayLoading(false);
-        return;
-      }
-
-      const rzp = new window.Razorpay({
-        key: data.keyId,
-        amount: data.amount * 100,
-        currency: "INR",
-        name: "Heatwave",
-        description: data.eventName,
-        order_id: data.razorpayOrderId,
-        prefill: data.prefill,
-        theme: { color: "#E5251B" },
-        handler: async (response: {
-          razorpay_order_id: string;
-          razorpay_payment_id: string;
-          razorpay_signature: string;
-        }) => {
-          const verifyRes = await fetch("/api/registrations/verify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              registrationId: data.registrationId,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-          setPayLoading(false);
-          if (!verifyRes.ok) {
-            setPayError(verifyData.error || "Payment verification failed");
-            return;
-          }
-          setTicketResult(verifyData);
-          go(3);
-        },
-        modal: {
-          ondismiss: () => setPayLoading(false),
-        },
-      });
-      rzp.open();
+      setTicketResult(data);
+      go(3);
     } catch {
-      setPayError("Something went wrong. Try again.");
-      setPayLoading(false);
+      setSubmitError("Something went wrong. Try again.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
   const steps = ["Details", "Tickets", "Payment"];
+
+  if (existing && !ticketResult) {
+    return (
+      <Page>
+        <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
+          <div className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#141414]">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4V8z"
+                stroke="#fff"
+                strokeWidth="1.8"
+                strokeLinejoin="round"
+              />
+              <path d="M14 6v12" stroke="#fff" strokeWidth="1.8" strokeDasharray="2 2" />
+            </svg>
+          </div>
+          <h1 className="m-0 mt-7 text-[40px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[60px]">
+            You&apos;re already registered
+          </h1>
+          <p className="mt-3.5 text-[17px] leading-relaxed text-[#6B6B6B]">
+            This account already has a ticket for{" "}
+            <span className="font-medium text-[#141414]">
+              {existing.eventName ?? event?.name ?? "this event"}
+            </span>
+            . Only one registration is allowed per account — check your ticket in My Tickets.
+          </p>
+          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#EDE6E3] bg-[#FAF7F5] px-4 py-2 text-sm">
+            {existing.ticketCode && (
+              <span className="font-bold tabular-nums">{existing.ticketCode}</span>
+            )}
+            {existing.ticketCode && <span className="text-[#B5ADA9]">·</span>}
+            <span className="text-[#6B6B6B]">{EXISTING_LABEL[existing.status]}</span>
+          </div>
+          <Link href="/dashboard" className={`mt-8 ${btn}`}>
+            Go to My Tickets →
+          </Link>
+          <Link href="/" className="mt-7 text-sm font-bold text-[#6B6B6B]">
+            Back to event page
+          </Link>
+        </main>
+      </Page>
+    );
+  }
 
   if (step === 3 && ticketResult) {
     const who = values.fullName || user?.email || "";
@@ -397,13 +474,28 @@ export default function RegisterPage() {
             You&apos;re in!
           </h1>
           <p className="mt-3.5 text-[17px] leading-relaxed text-[#6B6B6B]">
-            Your ticket has been sent to{" "}
-            <span className="font-medium text-[#141414]">{values.email}</span>
+            We&apos;ve received your payment details. Your ticket is below and in{" "}
+            <span className="font-medium text-[#141414]">My Tickets</span>.
           </p>
 
-          <div className="mt-10 w-full overflow-hidden rounded-xl border border-[#EDE6E3] bg-white text-left">
+          <div className="mt-6 flex w-full items-start gap-3 rounded-xl bg-[#FFF6E5] px-5 py-4 text-left text-sm leading-relaxed text-[#8A5A00]">
+            <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#D99A1E]" />
+            <span>
+              <span className="font-bold">Payment verification pending.</span> We&apos;ll match UPI
+              transaction <span className="font-bold tabular-nums">{upiTxnId}</span> with our
+              account. Your QR will work at the entrance once it&apos;s verified.
+            </span>
+          </div>
+
+          <div className="mt-6 w-full overflow-hidden rounded-xl border border-[#EDE6E3] bg-white text-left">
             <div className="px-7 py-6">
-              <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">E-TICKET</div>
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">E-TICKET</div>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF6E5] px-2.5 py-0.5 text-xs font-bold text-[#8A5A00]">
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#D99A1E]" />
+                  Verification pending
+                </span>
+              </div>
               <div className="mt-2 text-2xl font-black tracking-[-0.03em]">
                 {ticketResult.eventName}
               </div>
@@ -424,7 +516,9 @@ export default function RegisterPage() {
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
                     TICKET
                   </div>
-                  <div className="mt-1 text-[15px] font-bold">{selectedTier?.name}</div>
+                  <div className="mt-1 text-[15px] font-bold">
+                    {ticketResult.tierName ?? selectedTier?.name}
+                  </div>
                 </div>
                 <div>
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
@@ -445,7 +539,8 @@ export default function RegisterPage() {
                 <QRCodeSVG value={ticketResult.ticketCode} size={112} />
               </div>
               <div className="flex-1 basis-[200px] text-sm leading-relaxed text-[#6B6B6B]">
-                Show this code at the entrance.
+                Show this code at the entrance. Keep your UPI payment screenshot handy in case
+                we need it.
               </div>
             </div>
           </div>
@@ -471,11 +566,6 @@ export default function RegisterPage() {
 
   return (
     <Page>
-      <Script
-        src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="afterInteractive"
-        onLoad={() => setRazorpayReady(true)}
-      />
       <main className="mx-auto max-w-[1200px] px-6 py-10 pb-24">
         <div className="flex items-start gap-12">
           <div className="min-w-0 max-w-[720px] flex-1">
@@ -632,7 +722,7 @@ export default function RegisterPage() {
 
             {step === 2 && (
               <section className="mt-10">
-                <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">Payment</h2>
+                <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">Pay with UPI</h2>
                 <div className="rounded-xl border border-[#EDE6E3] p-5">
                   <div className="flex justify-between gap-3 text-[15px]">
                     <span>{selectedTier?.name}</span>
@@ -640,10 +730,129 @@ export default function RegisterPage() {
                   </div>
                 </div>
 
-                {payError && (
-                  <div className="mt-3 flex items-center gap-2 text-sm text-[#C8372D]">
+                {UPI_ID ? (
+                  <div className="mt-4 flex flex-col items-center gap-6 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6 sm:flex-row">
+                    <div className="flex-none rounded-xl border border-[#EDE6E3] bg-white p-3">
+                      <QRCodeSVG
+                        value={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
+                        size={184}
+                      />
+                    </div>
+                    <div className="min-w-0 flex-1 text-center sm:text-left">
+                      <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
+                        SCAN &amp; PAY
+                      </div>
+                      <div className="mt-1 text-[32px] font-black tracking-[-0.03em] tabular-nums">
+                        {fmt(amount)}
+                      </div>
+                      <div className="mt-1.5 text-sm leading-relaxed text-[#6B6B6B]">
+                        Scan with GPay, PhonePe, Paytm or any UPI app. Pay the exact amount, then
+                        enter the transaction ID below.
+                      </div>
+                      <button
+                        type="button"
+                        onClick={copyUpiId}
+                        className="mt-3.5 inline-flex max-w-full items-center gap-2 rounded-full border border-[#EDE6E3] bg-white px-4 py-2 text-sm"
+                      >
+                        <span className="truncate font-bold">{UPI_ID}</span>
+                        <span className="text-[#E5251B]">{copied ? "Copied" : "Copy"}</span>
+                      </button>
+                      <a
+                        href={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
+                        className="mt-3 flex h-11 items-center justify-center rounded-full border border-[#141414] px-5 text-sm font-bold sm:hidden"
+                      >
+                        Open UPI app
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-xl bg-[#FDECEA] px-5 py-4 text-sm text-[#B71C14]">
+                    UPI payments aren&apos;t set up yet. Please try again later.
+                  </div>
+                )}
+
+                <div className="mt-6">
+                  <Field
+                    fieldKey="upiTxnId"
+                    label="UPI transaction ID (12 digits)"
+                    mode="numeric"
+                    value={upiTxnId}
+                    isFocused={focus === "upiTxnId"}
+                    error={showTxnError}
+                    ok={!txnError && focus !== "upiTxnId"}
+                    onChange={(e) => setUpiTxnId(e.target.value.replace(/\D/g, "").slice(0, 12))}
+                    onFocus={() => setFocus("upiTxnId")}
+                    onBlur={() => {
+                      setFocus(null);
+                      setTxnTouched(true);
+                    }}
+                  />
+                  {!showTxnError && (
+                    <div className="ml-1 mt-1.5 text-[13px] text-[#6B6B6B]">
+                      Find it as &ldquo;UPI transaction ID&rdquo; or &ldquo;UTR&rdquo; in your UPI
+                      app · {upiTxnId.length}/12
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-4">
+                  <label
+                    htmlFor="hw-screenshot"
+                    style={{ borderColor: proofError || proofMissing ? "#E5251B" : "#EDE6E3" }}
+                    className="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-white p-4 transition-colors hover:bg-[#FCFAF9]"
+                  >
+                    {proofPreview ? (
+                      <Image
+                        src={proofPreview}
+                        alt="Payment screenshot preview"
+                        width={56}
+                        height={56}
+                        unoptimized
+                        className="h-14 w-14 flex-none rounded-lg border border-[#EDE6E3] object-cover"
+                      />
+                    ) : (
+                      <span className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[#FAF7F5] text-[#6B6B6B]">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                          <path
+                            d="M12 16V4m0 0l-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"
+                            stroke="currentColor"
+                            strokeWidth="1.8"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          />
+                        </svg>
+                      </span>
+                    )}
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[15px] font-bold">
+                        {proof ? proof.name : "Upload payment screenshot"}
+                      </span>
+                      <span className="block text-[13px] text-[#6B6B6B]">
+                        PNG, JPG, WEBP or HEIC · up to 5 MB
+                      </span>
+                    </span>
+                    <span className="flex-none text-sm font-bold text-[#E5251B]">
+                      {proof ? "Change" : "Browse"}
+                    </span>
+                  </label>
+                  <input
+                    id="hw-screenshot"
+                    type="file"
+                    accept={PROOF_TYPES.join(",")}
+                    onChange={onProofChange}
+                    className="sr-only"
+                  />
+                  {(proofError || proofMissing) && (
+                    <div className="ml-1 mt-1.5 text-[13px] text-[#C8372D]">
+                      {proofError || proofMissing}
+                    </div>
+                  )}
+                </div>
+
+                {submitError && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-[#C8372D]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#E5251B]" />
-                    {payError}
+                    {submitError}
                   </div>
                 )}
 
@@ -655,22 +864,23 @@ export default function RegisterPage() {
                     ← Back
                   </button>
                   <button
-                    onClick={handlePay}
-                    disabled={payLoading || !razorpayReady}
-                    className={`min-w-[180px] justify-center ${btn}`}
+                    onClick={handleSubmit}
+                    disabled={submitting || !UPI_ID}
+                    className={`min-w-[200px] justify-center ${btn}`}
                   >
-                    {payLoading ? (
+                    {submitting ? (
                       <>
                         <span className="inline-block h-[18px] w-[18px] animate-[hwSpin_0.7s_linear_infinite] rounded-full border-2 border-white/35 border-t-white" />
-                        Processing…
+                        Submitting…
                       </>
                     ) : (
-                      `Pay ${fmt(amount)}`
+                      "Complete payment"
                     )}
                   </button>
                 </div>
                 <div className="mt-4 text-right text-[13px] text-[#6B6B6B]">
-                  Secured payment via Razorpay · By paying, you agree to our{" "}
+                  Your ticket is issued right away and activates once we verify the payment · By
+                  continuing, you agree to our{" "}
                   <Link href="/terms" className="font-bold text-[#141414] underline">
                     Terms
                   </Link>{" "}
