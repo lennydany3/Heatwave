@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent, type FocusEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FocusEvent } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 const btn =
   "inline-flex h-14 items-center justify-center gap-2 rounded-full text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
@@ -40,8 +41,16 @@ export default function LoginPage() {
   const [focus, setFocus] = useState<FieldKey | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
+  const [next, setNext] = useState("/dashboard");
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    // window isn't available during SSR, so this can't run during render.
+    const params = new URLSearchParams(window.location.search);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNext(params.get("next") || "/dashboard");
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
     if (!/^\S+@\S+\.\S+$/.test(email) || pw.length < 6) {
@@ -50,9 +59,29 @@ export default function LoginPage() {
     }
     setErr("");
     setLoading(true);
-    setTimeout(() => {
-      router.push("/dashboard");
-    }, 1200);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pw,
+    });
+    setLoading(false);
+    if (error) {
+      setErr(error.message);
+      return;
+    }
+    router.push(next);
+  }
+
+  async function handleGoogle() {
+    const supabase = createClient();
+    await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+          next
+        )}`,
+      },
+    });
   }
 
   function field(key: FieldKey) {
@@ -206,7 +235,7 @@ export default function LoginPage() {
 
             <button
               type="button"
-              onClick={() => router.push("/dashboard")}
+              onClick={handleGoogle}
               className="flex h-14 w-full items-center justify-center gap-3 rounded-full border border-[#EDE6E3] text-[15px] font-bold transition-colors hover:bg-[#FAF7F5]"
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EDE6E3] text-xs font-black">
@@ -217,7 +246,10 @@ export default function LoginPage() {
 
             <p className="mt-8 text-center text-[15px] text-[#6B6B6B]">
               New here?{" "}
-              <Link href="#" className="font-bold text-[#141414]">
+              <Link
+                href={`/?auth=1&next=${encodeURIComponent(next)}`}
+                className="font-bold text-[#141414]"
+              >
                 Create an account
               </Link>
             </p>

@@ -2,7 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useState, type MouseEvent } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import AuthModal from "@/components/auth/AuthModal";
 
 const btn =
   "inline-flex items-center justify-center gap-2.5 rounded-full text-white font-bold transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
@@ -137,6 +140,12 @@ const SEATS_LEFT = 42;
 export default function EventPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
+  const { user, loading: authLoading, signOut } = useAuth();
+  const router = useRouter();
+  const [authOpen, setAuthOpen] = useState(false);
+  const [redirectAfterAuth, setRedirectAfterAuth] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     const onScroll = () => setShowBar(window.scrollY > 520);
@@ -144,6 +153,39 @@ export default function EventPage() {
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  useEffect(() => {
+    // Reads the proxy's redirect params (window isn't available during SSR,
+    // so this can't be computed during render).
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("auth") === "1") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setRedirectAfterAuth(params.get("next") || "/events/registations");
+      setAuthOpen(true);
+    }
+  }, []);
+
+  function handleRegisterClick(e: MouseEvent) {
+    e.preventDefault();
+    if (user) {
+      router.push("/events/registations");
+      return;
+    }
+    setRedirectAfterAuth("/events/registations");
+    setAuthOpen(true);
+  }
+
+  function openLogin() {
+    setRedirectAfterAuth(null);
+    setAuthOpen(true);
+  }
+
+  function handleAuthenticated() {
+    setAuthOpen(false);
+    if (redirectAfterAuth) {
+      router.push(redirectAfterAuth);
+    }
+  }
 
   return (
     <div
@@ -159,20 +201,43 @@ export default function EventPage() {
             heatwave
             <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
           </Link>
-          <nav className="flex items-center gap-7 text-sm font-medium">
-            <a href="#about" className="hover:text-[#E5251B]">
-              About
-            </a>
-            <a href="#schedule" className="hover:text-[#E5251B]">
-              Schedule
-            </a>
-            <a href="#venue" className="hover:text-[#E5251B]">
-              Venue
-            </a>
-            <a href="#faq" className="hover:text-[#E5251B]">
-              FAQ
-            </a>
-          </nav>
+          <div className="flex items-center gap-7">
+            <nav className="flex items-center gap-7 text-sm font-medium">
+              <a href="#about" className="hover:text-[#E5251B]">
+                About
+              </a>
+              <a href="#schedule" className="hover:text-[#E5251B]">
+                Schedule
+              </a>
+              <a href="#venue" className="hover:text-[#E5251B]">
+                Venue
+              </a>
+              <a href="#faq" className="hover:text-[#E5251B]">
+                FAQ
+              </a>
+              {user && (
+                <Link href="/dashboard" className="hover:text-[#E5251B]">
+                  My Tickets
+                </Link>
+              )}
+            </nav>
+            {!authLoading &&
+              (user ? (
+                <button
+                  onClick={() => signOut()}
+                  className="text-sm font-bold text-[#6B6B6B] hover:text-[#141414]"
+                >
+                  Log out
+                </button>
+              ) : (
+                <button
+                  onClick={openLogin}
+                  className="text-sm font-bold text-[#141414] hover:text-[#E5251B]"
+                >
+                  Log in
+                </button>
+              ))}
+          </div>
         </div>
       </header>
 
@@ -206,12 +271,12 @@ export default function EventPage() {
             </div>
 
             <div className="mt-9 flex flex-wrap items-center gap-5">
-              <Link
-                href="/events/registations"
+              <button
+                onClick={handleRegisterClick}
                 className={`h-14 px-8 text-base ${btn}`}
               >
                 Register now <span>→</span>
-              </Link>
+              </button>
               <span className="text-sm text-[#6B6B6B]">
                 <span className="font-bold text-[#141414]">{SEATS_LEFT}</span>{" "}
                 seats left
@@ -441,14 +506,21 @@ export default function EventPage() {
               seats left · Sat, 13 Feb
             </div>
           </div>
-          <Link
-            href="/events/registations"
+          <button
+            onClick={handleRegisterClick}
             className={`h-12 whitespace-nowrap px-7 text-[15px] ${btn}`}
           >
             Register
-          </Link>
+          </button>
         </div>
       </div>
+
+      <AuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        onAuthenticated={handleAuthenticated}
+        next={redirectAfterAuth || "/"}
+      />
     </div>
   );
 }

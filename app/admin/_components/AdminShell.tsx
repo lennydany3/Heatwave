@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type ReactNode } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { ADMIN_NAV, type AdminPageKey } from "../_lib/data";
 
 const createBtn =
@@ -55,9 +57,18 @@ export default function AdminShell({
   children: ReactNode;
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const email = user?.email ?? "";
+  const initials = email ? email.slice(0, 2).toUpperCase() : "AD";
 
   function handleSearch(e: ChangeEvent<HTMLInputElement>) {
     onSearchChange(e.target.value);
+  }
+
+  async function handleLogout() {
+    await signOut();
+    router.push("/admin/login");
   }
 
   return (
@@ -84,7 +95,13 @@ export default function AdminShell({
         <div className="mt-auto border-t border-[#EDE6E3] px-3 py-3.5 text-[13px] text-[#6B6B6B]">
           Signed in as
           <br />
-          <span className="font-bold text-[#141414]">Lakshmi Venkatesh</span>
+          <span className="font-bold text-[#141414]">{email}</span>
+          <button
+            onClick={handleLogout}
+            className="mt-2 block text-sm font-bold text-[#E5251B]"
+          >
+            Log out
+          </button>
         </div>
       </aside>
 
@@ -108,12 +125,12 @@ export default function AdminShell({
               onNavigate={() => setDrawerOpen(false)}
               itemClassName="flex items-center gap-3 rounded-[10px] px-3 py-3 text-[15px] font-bold"
             />
-            <Link
-              href="/admin/login"
-              className="mt-auto px-3 py-3 text-sm font-bold text-[#E5251B]"
+            <button
+              onClick={handleLogout}
+              className="mt-auto px-3 py-3 text-left text-sm font-bold text-[#E5251B]"
             >
               Log out
-            </Link>
+            </button>
           </aside>
         </div>
       )}
@@ -144,7 +161,7 @@ export default function AdminShell({
               <span className="sm:hidden">+ New</span>
             </Link>
             <span className="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-[#141414] text-[13px] font-bold text-white">
-              LV
+              {initials}
             </span>
           </div>
         </header>

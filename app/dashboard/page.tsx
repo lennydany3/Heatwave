@@ -1,50 +1,59 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { createClient } from "@/utils/supabase/client";
 
-type TicketStatus = "Confirmed" | "Pending" | "Cancelled" | "Checked-in";
+type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in";
 type TabId = "upcoming" | "past" | "cancelled";
 
 type Ticket = {
-  id: number;
+  id: string;
   title: string;
   date: string;
   time: string;
   venue: string;
-  area: string;
   type: string;
   qty: number;
   price: number;
   bid: string;
   status: TicketStatus;
   tab: TabId;
-  when?: string;
+  startsAt: string | null;
 };
 
-const TICKETS: Ticket[] = [
-  { id: 1, title: "Bay Beats Festival", date: "Sat, 6 Mar 2027", time: "4:00 PM", venue: "Chennai Trade Centre", area: "Nandambakkam, Chennai", type: "GA Pass", qty: 2, price: 1799, bid: "HW-27-5103", status: "Confirmed", tab: "upcoming", when: "in 12 days" },
-  { id: 2, title: "Chennai Product Summit", date: "Fri, 19 Mar 2027", time: "9:30 AM", venue: "IIT Madras Research Park", area: "Taramani, Chennai", type: "Regular", qty: 1, price: 1499, bid: "HW-27-5288", status: "Confirmed", tab: "upcoming" },
-  { id: 3, title: "Carnatic Fusion Night", date: "Sun, 28 Mar 2027", time: "7:00 PM", venue: "The Music Academy", area: "Royapettah, Chennai", type: "Balcony", qty: 2, price: 600, bid: "HW-27-5412", status: "Pending", tab: "upcoming" },
-  { id: 4, title: "Marina Sunrise 10K", date: "Sun, 11 Apr 2027", time: "5:30 AM", venue: "Marina Beach, Lighthouse", area: "Mylapore, Chennai", type: "Runner", qty: 1, price: 899, bid: "HW-27-5530", status: "Confirmed", tab: "upcoming" },
-  { id: 5, title: "Coffee & Code Meetup", date: "Sat, 12 Dec 2026", time: "10:00 AM", venue: "Express Avenue", area: "Royapettah, Chennai", type: "Free", qty: 1, price: 0, bid: "HW-26-4471", status: "Checked-in", tab: "past" },
-  { id: 6, title: "Margazhi Dance Evening", date: "Sun, 20 Dec 2026", time: "6:30 PM", venue: "Kalakshetra Foundation", area: "Thiruvanmiyur, Chennai", type: "Front rows", qty: 2, price: 750, bid: "HW-26-4519", status: "Checked-in", tab: "past" },
-  { id: 7, title: "Design Leadership Breakfast", date: "Thu, 14 Jan 2027", time: "8:00 AM", venue: "Taj Coromandel", area: "Nungambakkam, Chennai", type: "Invite", qty: 1, price: 0, bid: "HW-27-4802", status: "Checked-in", tab: "past" },
-  { id: 8, title: "Stand-up Sunday", date: "Sun, 7 Feb 2027", time: "8:00 PM", venue: "Phoenix Marketcity", area: "Velachery, Chennai", type: "Regular", qty: 2, price: 499, bid: "HW-27-4990", status: "Cancelled", tab: "cancelled" },
-];
+type TicketRow = {
+  id: string;
+  ticket_code: string;
+  status: "valid" | "checked_in" | "cancelled";
+  created_at: string;
+  registrations: { amount: number; ticket_tiers: { name: string } | null } | null;
+  events: { name: string; venue: string | null; starts_at: string | null } | null;
+};
 
 const BADGE: Record<TicketStatus, { bg: string; fg: string; dot: string }> = {
   Confirmed: { bg: "#EEF4EF", fg: "#2F6B45", dot: "#3F8A5A" },
-  Pending: { bg: "#FAF7F5", fg: "#6B6B6B", dot: "#B5ADA9" },
   Cancelled: { bg: "#FDECEA", fg: "#B71C14", dot: "#E5251B" },
   "Checked-in": { bg: "#141414", fg: "#FFFFFF", dot: "#FFFFFF" },
 };
 
 const fmt = (n: number) => (n ? "₹" + n.toLocaleString("en-IN") : "Free");
 
-function qrPath(seed: number): string {
+function relativeWhen(iso: string | null): string {
+  if (!iso) return "";
+  const days = Math.round((new Date(iso).getTime() - Date.now()) / 86400000);
+  if (days <= 0) return "today";
+  if (days === 1) return "tomorrow";
+  return `in ${days} days`;
+}
+
+function qrPath(seed: string): string {
+  let hashed = 0;
+  for (let i = 0; i < seed.length; i++) hashed = (hashed * 31 + seed.charCodeAt(i)) >>> 0;
+  let s = hashed || 1;
   const N = 29;
-  let s = seed * 7919 + 13;
   let d = "";
   const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
   for (let y = 0; y < N; y++) {
@@ -108,19 +117,96 @@ function Wave() {
 }
 
 export default function DashboardPage() {
+  const { user, signOut } = useAuth();
+  const router = useRouter();
+  const fullName =
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email?.split("@")[0] ||
+    "there";
+  const firstName = fullName.split(" ")[0];
+  const initials =
+    fullName
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((s) => s[0]?.toUpperCase())
+      .join("") || "U";
+
+  async function handleLogout() {
+    await signOut();
+    router.push("/");
+  }
+
   const [tab, setTab] = useState<TabId>("upcoming");
+  const [tickets, setTickets] = useState<Ticket[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [open, setOpen] = useState<number | null>(null);
-  const [confirm, setConfirm] = useState(false);
-  const [cancelled, setCancelled] = useState<Record<number, boolean>>({});
+  const [open, setOpen] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
-    const t = setTimeout(() => setLoading(false), 900);
-    return () => clearTimeout(t);
-  }, []);
+    if (!user) return;
+    let cancelled = false;
+
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("tickets")
+        .select(
+          "id, ticket_code, status, created_at, registrations(amount, ticket_tiers(name)), events(name, venue, starts_at)"
+        )
+        .order("created_at", { ascending: false })
+        .returns<TicketRow[]>();
+
+      if (cancelled) return;
+
+      const mapped: Ticket[] = (data ?? []).map((row) => {
+        const startsAt = row.events?.starts_at ?? null;
+        const isPast = startsAt ? new Date(startsAt).getTime() < Date.now() : false;
+        const status: TicketStatus =
+          row.status === "cancelled"
+            ? "Cancelled"
+            : row.status === "checked_in"
+              ? "Checked-in"
+              : "Confirmed";
+        return {
+          id: row.id,
+          title: row.events?.name ?? "Event",
+          date: startsAt
+            ? new Date(startsAt).toLocaleDateString("en-IN", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              })
+            : "",
+          time: startsAt
+            ? new Date(startsAt).toLocaleTimeString("en-IN", {
+                hour: "numeric",
+                minute: "2-digit",
+              })
+            : "",
+          venue: row.events?.venue ?? "",
+          type: row.registrations?.ticket_tiers?.name ?? "Ticket",
+          qty: 1,
+          price: row.registrations?.amount ?? 0,
+          bid: row.ticket_code,
+          status,
+          tab: status === "Cancelled" ? "cancelled" : isPast ? "past" : "upcoming",
+          startsAt,
+        };
+      });
+
+      setTickets(mapped);
+      setLoading(false);
+    }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   function showToast(msg: string) {
     clearTimeout(toastTimer.current);
@@ -129,7 +215,7 @@ export default function DashboardPage() {
   }
 
   function downloadIcs(t: Ticket) {
-    const body = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${t.title}\nLOCATION:${t.venue}, ${t.area}\nDESCRIPTION:Booking ${t.bid}\nEND:VEVENT\nEND:VCALENDAR`;
+    const body = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${t.title}\nLOCATION:${t.venue}\nDESCRIPTION:Booking ${t.bid}\nEND:VEVENT\nEND:VCALENDAR`;
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([body], { type: "text/calendar" }));
     a.download = t.bid + ".ics";
@@ -137,33 +223,12 @@ export default function DashboardPage() {
     showToast("Calendar file downloaded");
   }
 
-  function deco(t: Ticket) {
-    const status: TicketStatus = cancelled[t.id] ? "Cancelled" : t.status;
-    const b = BADGE[status];
-    return {
-      ...t,
-      status,
-      badge: b,
-      qtyL: t.qty + (t.qty > 1 ? " tickets" : " ticket"),
-      total: fmt(t.price * t.qty),
-      fee: t.price ? "₹49" : "₹0",
-      grand: t.price ? fmt(t.price * t.qty + 49) : "Free",
-      canCancel: status === "Confirmed" || status === "Pending",
-    };
-  }
-
-  const list = useMemo(
-    () =>
-      TICKETS.map(deco).map((t) => ({ ...t, tabNow: t.status === "Cancelled" ? "cancelled" : t.tab })),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [cancelled]
-  );
-  const inTab = list.filter((t) => t.tabNow === tab);
+  const inTab = useMemo(() => tickets.filter((t) => t.tab === tab), [tickets, tab]);
   const hl = tab === "upcoming" ? inTab[0] : undefined;
   const rest = hl ? inTab.slice(1) : inTab;
-  const cur = open != null ? deco(TICKETS.find((t) => t.id === open)!) : null;
+  const cur = open != null ? tickets.find((t) => t.id === open) ?? null : null;
   const counts = { upcoming: 0, past: 0, cancelled: 0 };
-  list.forEach((t) => counts[t.tabNow as TabId]++);
+  tickets.forEach((t) => counts[t.tab]++);
 
   return (
     <div
@@ -191,25 +256,25 @@ export default function DashboardPage() {
               className="flex items-center gap-2.5"
             >
               <span className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#141414] text-sm font-bold text-white">
-                PR
+                {initials}
               </span>
               <span className="hidden text-xs text-[#6B6B6B] lg:inline">▼</span>
             </button>
             {menuOpen && (
               <div className="absolute right-0 top-12 w-[220px] animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] bg-white p-2 shadow-[0_8px_24px_rgba(20,20,20,.06)]">
                 <div className="mb-1.5 border-b border-[#EDE6E3] px-3 pb-3 pt-2.5">
-                  <div className="text-[15px] font-bold">Priya Raghavan</div>
-                  <div className="text-[13px] text-[#6B6B6B]">priya.r@example.com</div>
+                  <div className="text-[15px] font-bold">{fullName}</div>
+                  <div className="text-[13px] text-[#6B6B6B]">{user?.email}</div>
                 </div>
                 <Link href="#" className="block rounded-lg px-3 py-2.5 text-sm hover:bg-[#FAF7F5]">
                   Profile settings
                 </Link>
-                <Link
-                  href="/login"
-                  className="block rounded-lg px-3 py-2.5 text-sm text-[#E5251B] hover:bg-[#FDECEA]"
+                <button
+                  onClick={handleLogout}
+                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-[#E5251B] hover:bg-[#FDECEA]"
                 >
                   Log out
-                </Link>
+                </button>
               </div>
             )}
           </div>
@@ -220,12 +285,14 @@ export default function DashboardPage() {
         <div className="flex animate-[hwUp_0.5s_ease_both] flex-wrap items-end justify-between gap-5">
           <div>
             <h1 className="m-0 text-[40px] font-black leading-[1] tracking-[-0.05em] sm:text-[64px]">
-              Hi, Priya
+              Hi, {firstName}
             </h1>
             <p className="mt-2.5 text-[17px] text-[#6B6B6B]">
               {counts.upcoming === 0
                 ? "Your tickets will show up here once you book."
-                : `You have ${counts.upcoming} upcoming ${counts.upcoming === 1 ? "event" : "events"}. The next one is ${TICKETS[0].when}.`}
+                : `You have ${counts.upcoming} upcoming ${counts.upcoming === 1 ? "event" : "events"}.${
+                    hl ? ` The next one is ${relativeWhen(hl.startsAt)}.` : ""
+                  }`}
             </p>
           </div>
           <Link
@@ -243,7 +310,7 @@ export default function DashboardPage() {
         {!loading && hl && (
           <>
             <div className="mt-10 text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-              NEXT UP · {hl.when}
+              NEXT UP · {relativeWhen(hl.startsAt)}
             </div>
             <div className="mt-3.5 flex animate-[hwUp_0.5s_0.1s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white lg:flex-row">
               <div className="flex min-w-0 flex-1">
@@ -252,9 +319,9 @@ export default function DashboardPage() {
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span
                       className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                      style={{ background: hl.badge.bg, color: hl.badge.fg }}
+                      style={{ background: BADGE[hl.status].bg, color: BADGE[hl.status].fg }}
                     >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: hl.badge.dot }} />
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[hl.status].dot }} />
                       {hl.status}
                     </span>
                     <span className="text-[13px] text-[#6B6B6B]">{hl.bid}</span>
@@ -277,17 +344,12 @@ export default function DashboardPage() {
                     </div>
                     <div>
                       <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">TICKET</div>
-                      <div className="mt-1 text-base font-bold">
-                        {hl.type} · {hl.qtyL}
-                      </div>
+                      <div className="mt-1 text-base font-bold">{hl.type}</div>
                     </div>
                   </div>
                   <div className="mt-8 flex flex-wrap gap-2.5">
                     <button
-                      onClick={() => {
-                        setOpen(hl.id);
-                        setConfirm(false);
-                      }}
+                      onClick={() => setOpen(hl.id)}
                       className="inline-flex h-12 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6.5 text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
                     >
                       View ticket
@@ -301,7 +363,7 @@ export default function DashboardPage() {
                     <button
                       onClick={() =>
                         window.open(
-                          "https://maps.google.com/?q=" + encodeURIComponent(hl.venue + " Chennai"),
+                          "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
                           "_blank"
                         )
                       }
@@ -317,7 +379,7 @@ export default function DashboardPage() {
                 <span className="absolute -right-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white lg:-bottom-3 lg:-left-3 lg:right-auto lg:top-auto" />
                 <div className="h-40 w-40 rounded-lg border border-[#EDE6E3] bg-white p-3">
                   <svg viewBox="0 0 29 29" shapeRendering="crispEdges" className="block h-full w-full">
-                    <path d={qrPath(hl.id)} fill="#141414" />
+                    <path d={qrPath(hl.bid)} fill="#141414" />
                   </svg>
                 </div>
                 <div className="text-center text-xs text-[#6B6B6B]">Scan at entry</div>
@@ -378,9 +440,9 @@ export default function DashboardPage() {
                   <PlaceholderThumb className="h-full w-full" />
                   <span
                     className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                    style={{ background: c.badge.bg, color: c.badge.fg }}
+                    style={{ background: BADGE[c.status].bg, color: BADGE[c.status].fg }}
                   >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: c.badge.dot }} />
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[c.status].dot }} />
                     {c.status}
                   </span>
                 </div>
@@ -389,23 +451,18 @@ export default function DashboardPage() {
                     {c.date} · {c.time}
                   </div>
                   <div className="mt-1.5 text-[19px] font-black tracking-[-0.02em]">{c.title}</div>
-                  <div className="mt-1 text-sm text-[#6B6B6B]">
-                    {c.type} · {c.qtyL}
-                  </div>
+                  <div className="mt-1 text-sm text-[#6B6B6B]">{c.type}</div>
                   <div className="mt-4.5 flex items-center justify-between gap-3 border-t border-[#EDE6E3] pt-3.5">
                     <span className="text-xs tabular-nums text-[#6B6B6B]">{c.bid}</span>
                     <span className="flex gap-4">
                       <button
-                        onClick={() => {
-                          setOpen(c.id);
-                          setConfirm(false);
-                        }}
+                        onClick={() => setOpen(c.id)}
                         className="text-sm font-bold text-[#E5251B] hover:text-[#B71C14]"
                       >
                         View
                       </button>
                       <button
-                        onClick={() => showToast("Ticket PDF saved · " + c.bid)}
+                        onClick={() => downloadIcs(c)}
                         className="text-sm font-bold hover:text-[#E5251B]"
                       >
                         Download
@@ -455,9 +512,9 @@ export default function DashboardPage() {
                 <span className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">TICKET</span>
                 <span
                   className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{ background: cur.badge.bg, color: cur.badge.fg }}
+                  style={{ background: BADGE[cur.status].bg, color: BADGE[cur.status].fg }}
                 >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: cur.badge.dot }} />
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[cur.status].dot }} />
                   {cur.status}
                 </span>
               </div>
@@ -473,7 +530,7 @@ export default function DashboardPage() {
               <div className="flex flex-1 basis-[280px] flex-col items-center gap-4 border-r border-[#EDE6E3] bg-[#FAF7F5] p-7">
                 <div className="aspect-square w-full max-w-[240px] rounded-xl border border-[#EDE6E3] bg-white p-4">
                   <svg viewBox="0 0 29 29" shapeRendering="crispEdges" className="block h-full w-full">
-                    <path d={qrPath(cur.id)} fill="#141414" />
+                    <path d={qrPath(cur.bid)} fill="#141414" />
                   </svg>
                 </div>
                 <div className="text-center">
@@ -482,7 +539,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="text-center">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">ATTENDEE</div>
-                  <div className="mt-1 text-base font-bold">Priya Raghavan</div>
+                  <div className="mt-1 text-base font-bold">{fullName}</div>
                 </div>
               </div>
               <div className="flex flex-[1.4_1_320px] flex-col gap-5.5 p-7">
@@ -493,36 +550,24 @@ export default function DashboardPage() {
                   <div className="mt-2 text-[15px] leading-relaxed text-[#6B6B6B]">
                     {cur.date} · {cur.time}
                     <br />
-                    {cur.venue}, {cur.area}
+                    {cur.venue}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2.5 rounded-xl border border-[#EDE6E3] p-4.5 text-[15px]">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">PAYMENT</div>
                   <div className="flex justify-between">
-                    <span>
-                      {cur.type} × {cur.qty}
-                    </span>
-                    <span>{cur.total}</span>
-                  </div>
-                  <div className="flex justify-between text-[#6B6B6B]">
-                    <span>Booking fee</span>
-                    <span>{cur.fee}</span>
+                    <span>{cur.type}</span>
+                    <span>{fmt(cur.price)}</span>
                   </div>
                   <div className="flex justify-between border-t border-[#EDE6E3] pt-2.5 font-black">
-                    <span>Paid via UPI</span>
-                    <span>{cur.grand}</span>
+                    <span>Paid via Razorpay</span>
+                    <span>{fmt(cur.price)}</span>
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   <button
                     onClick={() => downloadIcs(cur)}
                     className="inline-flex h-[46px] items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-5.5 text-sm font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
-                  >
-                    Download PDF
-                  </button>
-                  <button
-                    onClick={() => downloadIcs(cur)}
-                    className="inline-flex h-[46px] items-center rounded-full border border-[#EDE6E3] px-5 text-sm font-bold hover:bg-[#FAF7F5]"
                   >
                     Add to calendar
                   </button>
@@ -538,42 +583,6 @@ export default function DashboardPage() {
                     Share
                   </button>
                 </div>
-                {cur.canCancel && !confirm && (
-                  <button
-                    onClick={() => setConfirm(true)}
-                    className="self-start text-[13px] text-[#6B6B6B] underline decoration-1 underline-offset-[3px] hover:text-[#B71C14]"
-                  >
-                    Cancel booking
-                  </button>
-                )}
-                {cur.canCancel && confirm && (
-                  <div className="flex flex-col gap-3 rounded-xl bg-[#FDECEA] p-4.5">
-                    <div className="text-[15px] font-bold">Cancel this booking?</div>
-                    <div className="text-sm leading-relaxed text-[#6B6B6B]">
-                      {cur.grand} will be refunded to your UPI account in 5–7 working days. This
-                      can&apos;t be undone.
-                    </div>
-                    <div className="flex flex-wrap gap-2.5">
-                      <button
-                        onClick={() => setConfirm(false)}
-                        className="inline-flex h-10 items-center rounded-full border border-[#EDE6E3] bg-white px-4.5 text-sm font-bold"
-                      >
-                        Keep booking
-                      </button>
-                      <button
-                        onClick={() => {
-                          setCancelled((c) => ({ ...c, [cur.id]: true }));
-                          setOpen(null);
-                          setConfirm(false);
-                          showToast("Booking cancelled. Refund in 5–7 days.");
-                        }}
-                        className="inline-flex h-10 items-center rounded-full bg-[#B71C14] px-4.5 text-sm font-bold text-white"
-                      >
-                        Yes, cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>

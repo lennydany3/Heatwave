@@ -1,61 +1,84 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
-import { BOOKINGS, fmt } from "../_lib/data";
+import { fmt } from "../_lib/data";
+import { createClient } from "@/utils/supabase/client";
 
-type PayStatus = "Paid" | "Pending" | "Refunded" | "Failed";
+type PayStatus = "Paid" | "Pending" | "Failed";
 type Txn = {
   id: string;
   name: string;
   event: string;
   amount: number;
   tx: string;
-  method: string;
   st: PayStatus;
   date: string;
   time: string;
 };
 
+type RegistrationRow = {
+  id: string;
+  full_name: string;
+  amount: number;
+  status: "pending" | "paid" | "failed" | "cancelled";
+  created_at: string;
+  razorpay_payment_id: string | null;
+  events: { name: string } | null;
+};
+
 const PAY_BADGE: Record<PayStatus, [string, string, string]> = {
   Paid: ["#EEF4EF", "#2F6B45", "#3F8A5A"],
   Pending: ["#FAF7F5", "#6B6B6B", "#B5ADA9"],
-  Refunded: ["#F3EEEB", "#6B6B6B", "#6B6B6B"],
   Failed: ["#FDECEA", "#B71C14", "#E5251B"],
 };
-const STATUS_CYCLE: PayStatus[] = ["Paid", "Paid", "Paid", "Pending", "Paid", "Refunded", "Paid", "Failed"];
-const FILTERS = ["All", "Paid", "Pending", "Refunded", "Failed"];
+const FILTERS = ["All", "Paid", "Pending", "Failed"];
 
-const TRANSACTIONS: Txn[] = BOOKINGS.filter((b) => b.amount > 0).map((b, i) => ({
-  id: b.id,
-  name: b.name,
-  event: b.event,
-  amount: b.amount,
-  tx: "TXN" + (88231 - i * 97),
-  method: i % 3 === 1 ? "Card ·· 4242" : "UPI · " + b.name.split(" ")[0].toLowerCase() + "@okaxis",
-  st: STATUS_CYCLE[i % 8],
-  date: b.date,
-  time: (10 + (i % 9)) + ":" + String((i * 7) % 60).padStart(2, "0"),
-}));
+function mapStatus(status: RegistrationRow["status"]): PayStatus {
+  if (status === "paid") return "Paid";
+  if (status === "pending") return "Pending";
+  return "Failed";
+}
 
 export default function AdminPaymentsPage() {
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("All");
-  const [refund, setRefund] = useState<string | null>(null);
-  const [refunded, setRefunded] = useState<Record<string, boolean>>({});
-  const [toastMsg, setToastMsg] = useState("");
-  const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [loading, setLoading] = useState(true);
+  const [txns, setTxns] = useState<Txn[]>([]);
 
-  function showToast(msg: string) {
-    clearTimeout(toastTimer.current);
-    setToastMsg(msg);
-    toastTimer.current = setTimeout(() => setToastMsg(""), 2400);
-  }
-
-  const txns = useMemo(
-    () => TRANSACTIONS.map((t) => ({ ...t, st: refunded[t.id] ? ("Refunded" as PayStatus) : t.st })),
-    [refunded]
-  );
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("registrations")
+        .select("id, full_name, amount, status, created_at, razorpay_payment_id, events(name)")
+        .order("created_at", { ascending: false })
+        .returns<RegistrationRow[]>();
+      if (cancelled) return;
+      const mapped: Txn[] = (data ?? [])
+        .filter((r) => r.status !== "cancelled")
+        .map((r) => {
+          const created = new Date(r.created_at);
+          return {
+            id: r.id,
+            name: r.full_name,
+            event: r.events?.name ?? "—",
+            amount: r.amount,
+            tx: r.razorpay_payment_id ?? r.id.slice(0, 8).toUpperCase(),
+            st: mapStatus(r.status),
+            date: created.toLocaleDateString("en-IN", { day: "numeric", month: "short" }),
+            time: created.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" }),
+          };
+        });
+      setTxns(mapped);
+      setLoading(false);
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const rows = useMemo(() => {
     const query = q.trim().toLowerCase();
@@ -66,19 +89,9 @@ export default function AdminPaymentsPage() {
     );
   }, [txns, filter, q]);
 
-  const gross = txns.filter((t) => t.st === "Paid").reduce((a, t) => a + t.amount, 0);
-  const refunds = txns.filter((t) => t.st === "Refunded").reduce((a, t) => a + t.amount, 0);
-  const refundedCount = txns.filter((t) => t.st === "Refunded").length;
-  const refundTxn = refund ? txns.find((t) => t.id === refund) : undefined;
-
-  function doRefund() {
-    if (!refund || !refundTxn) return;
-    const id = refund;
-    const amount = refundTxn.amount;
-    setRefunded((r) => ({ ...r, [id]: true }));
-    setRefund(null);
-    showToast("Refund of " + fmt(amount) + " started");
-  }
+  const collected = txns.filter((t) => t.st === "Paid").reduce((a, t) => a + t.amount, 0);
+  const pending = txns.filter((t) => t.st === "Pending").reduce((a, t) => a + t.amount, 0);
+  const failedCount = txns.filter((t) => t.st === "Failed").length;
 
   return (
     <AdminShell active="payments" search={q} onSearchChange={setQ}>
@@ -91,9 +104,9 @@ export default function AdminPaymentsPage() {
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { l: "COLLECTED", v: fmt(gross), n: "Last 30 days" },
-          { l: "REFUNDED", v: fmt(refunds), n: `${refundedCount} transactions` },
-          { l: "NEXT PAYOUT", v: fmt(Math.round(gross * 0.96)), n: "Mon, 1 Feb to HDFC ·· 0921" },
+          { l: "COLLECTED", v: fmt(collected), n: `${txns.filter((t) => t.st === "Paid").length} paid` },
+          { l: "PENDING", v: fmt(pending), n: `${txns.filter((t) => t.st === "Pending").length} in progress` },
+          { l: "FAILED", v: String(failedCount), n: "attempts" },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">
             <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">{k.l}</div>
@@ -127,151 +140,93 @@ export default function AdminPaymentsPage() {
           </div>
         </div>
 
-        <div className="hidden lg:block">
-          <div className="grid grid-cols-[1fr_1.5fr_1.4fr_.8fr_.8fr_80px] gap-4 border-y border-[#EDE6E3] bg-[#FAF7F5] px-6 py-3 text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-            <span>TRANSACTION</span>
-            <span>ATTENDEE · EVENT</span>
-            <span>METHOD</span>
-            <span className="text-right">AMOUNT</span>
-            <span>STATUS</span>
-            <span />
-          </div>
-          {rows.map((r) => {
-            const b = PAY_BADGE[r.st];
-            const canRefund = r.st === "Paid";
-            return (
-              <div
-                key={r.id}
-                className="grid grid-cols-[1fr_1.5fr_1.4fr_.8fr_.8fr_80px] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3.5 text-sm transition-colors hover:bg-[#FCFAF9]"
-              >
-                <div>
-                  <div className="font-bold tabular-nums">{r.tx}</div>
-                  <div className="text-xs text-[#6B6B6B]">
-                    {r.date} · {r.time}
+        {loading && (
+          <div className="px-6 py-14 text-center text-sm text-[#6B6B6B]">Loading transactions…</div>
+        )}
+
+        {!loading && (
+          <>
+            <div className="hidden lg:block">
+              <div className="grid grid-cols-[1fr_1.5fr_.8fr_.8fr] gap-4 border-y border-[#EDE6E3] bg-[#FAF7F5] px-6 py-3 text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
+                <span>TRANSACTION</span>
+                <span>ATTENDEE · EVENT</span>
+                <span className="text-right">AMOUNT</span>
+                <span>STATUS</span>
+              </div>
+              {rows.map((r) => {
+                const b = PAY_BADGE[r.st];
+                return (
+                  <div
+                    key={r.id}
+                    className="grid grid-cols-[1fr_1.5fr_.8fr_.8fr] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3.5 text-sm transition-colors hover:bg-[#FCFAF9]"
+                  >
+                    <div>
+                      <div className="font-bold tabular-nums">{r.tx}</div>
+                      <div className="text-xs text-[#6B6B6B]">
+                        {r.date} · {r.time}
+                      </div>
+                    </div>
+                    <div className="min-w-0">
+                      <div className="truncate font-bold">{r.name}</div>
+                      <div className="truncate text-xs text-[#6B6B6B]">{r.event}</div>
+                    </div>
+                    <div className="text-right font-bold tabular-nums">{fmt(r.amount)}</div>
+                    <div>
+                      <span
+                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
+                        style={{ background: b[0], color: b[1] }}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
+                        {r.st}
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <div className="min-w-0">
-                  <div className="truncate font-bold">{r.name}</div>
-                  <div className="truncate text-xs text-[#6B6B6B]">{r.event}</div>
-                </div>
-                <div className="truncate text-[#6B6B6B]">{r.method}</div>
-                <div className="text-right font-bold tabular-nums">{fmt(r.amount)}</div>
-                <div>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                    style={{ background: b[0], color: b[1] }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                    {r.st}
-                  </span>
-                </div>
-                <div className="text-right">
-                  {canRefund && (
-                    <button
-                      onClick={() => setRefund(r.id)}
-                      className="text-[13px] font-bold text-[#B71C14] hover:text-[#E5251B]"
-                    >
-                      Refund
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                );
+              })}
+            </div>
 
-        <div className="border-t border-[#EDE6E3] lg:hidden">
-          {rows.map((r) => {
-            const b = PAY_BADGE[r.st];
-            const canRefund = r.st === "Paid";
-            return (
-              <div key={r.id} className="flex flex-col gap-1.5 border-b border-[#EDE6E3] px-5 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-bold">{r.name}</span>
-                  <span className="font-black">{fmt(r.amount)}</span>
-                </div>
-                <div className="text-[13px] text-[#6B6B6B]">
-                  {r.tx} · {r.method}
-                </div>
-                <div className="flex items-center justify-between">
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                    style={{ background: b[0], color: b[1] }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                    {r.st}
-                  </span>
-                  {canRefund && (
-                    <button
-                      onClick={() => setRefund(r.id)}
-                      className="text-[13px] font-bold text-[#B71C14]"
+            <div className="border-t border-[#EDE6E3] lg:hidden">
+              {rows.map((r) => {
+                const b = PAY_BADGE[r.st];
+                return (
+                  <div key={r.id} className="flex flex-col gap-1.5 border-b border-[#EDE6E3] px-5 py-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-bold">{r.name}</span>
+                      <span className="font-black">{fmt(r.amount)}</span>
+                    </div>
+                    <div className="text-[13px] text-[#6B6B6B]">
+                      {r.tx} · {r.event}
+                    </div>
+                    <span
+                      className="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
+                      style={{ background: b[0], color: b[1] }}
                     >
-                      Refund
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
+                      {r.st}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
 
-        {rows.length === 0 && (
-          <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-            <div className="text-lg font-bold">No transactions here</div>
-            <div className="mt-1.5 text-sm text-[#6B6B6B]">Nothing matches this filter yet.</div>
-            <button
-              onClick={() => {
-                setFilter("All");
-                setQ("");
-              }}
-              className="mt-4 text-sm font-bold text-[#E5251B]"
-            >
-              Show all
-            </button>
-          </div>
+            {rows.length === 0 && (
+              <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
+                <div className="text-lg font-bold">No transactions here</div>
+                <div className="mt-1.5 text-sm text-[#6B6B6B]">Nothing matches this filter yet.</div>
+                <button
+                  onClick={() => {
+                    setFilter("All");
+                    setQ("");
+                  }}
+                  className="mt-4 text-sm font-bold text-[#E5251B]"
+                >
+                  Show all
+                </button>
+              </div>
+            )}
+          </>
         )}
       </section>
-
-      {refundTxn && (
-        <div
-          onClick={() => setRefund(null)}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#141414]/36 p-6"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-[420px] animate-[hwUp_0.25s_ease_both] rounded-xl bg-white p-7"
-          >
-            <div className="text-[22px] font-black tracking-[-0.025em]">
-              Refund {fmt(refundTxn.amount)}?
-            </div>
-            <p className="mt-2.5 text-[15px] leading-relaxed text-[#6B6B6B]">
-              {refundTxn.tx} from {refundTxn.name} will be refunded to {refundTxn.method}. Their
-              booking will be cancelled.
-            </p>
-            <div className="mt-6 flex justify-end gap-2.5">
-              <button
-                onClick={() => setRefund(null)}
-                className="h-11 rounded-full border border-[#EDE6E3] px-5 text-sm font-bold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={doRefund}
-                className="h-11 rounded-full bg-[#B71C14] px-5 text-sm font-bold text-white"
-              >
-                Refund
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {toastMsg && (
-        <div className="fixed bottom-7 left-1/2 z-[80] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
-          {toastMsg}
-        </div>
-      )}
     </AdminShell>
   );
 }

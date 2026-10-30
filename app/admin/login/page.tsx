@@ -2,46 +2,55 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
+import { createClient } from "@/utils/supabase/client";
 
 const btn =
-  "inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-full text-base font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
+  "inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-full text-base font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left disabled:opacity-60";
 
-type FieldKey = "email" | "pw" | "code";
+type FieldKey = "email" | "pw";
 
 export default function AdminLoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("ops@heatwave.in");
+  const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
-  const [code, setCode] = useState("");
   const [show, setShow] = useState(false);
   const [focus, setFocus] = useState<FieldKey | null>(null);
   const [err, setErr] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("error") === "not-admin") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setErr("That account doesn't have admin access.");
+    }
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (loading) return;
     if (!/^\S+@\S+\.\S+$/.test(email) || pw.length < 6) {
       setErr("Incorrect email or password");
       return;
     }
-    if (code && code.length !== 6) {
-      setErr("Enter the 6-digit code from your authenticator app");
-      return;
-    }
     setErr("");
     setLoading(true);
-    setTimeout(() => {
-      router.push("/admin");
-    }, 1100);
+    const supabase = createClient();
+    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
+    if (error) {
+      setLoading(false);
+      setErr(error.message);
+      return;
+    }
+    router.push("/admin");
   }
 
   function field(key: FieldKey) {
-    const value = key === "email" ? email : key === "pw" ? pw : code;
+    const value = key === "email" ? email : pw;
     const isFocused = focus === key;
     const up = isFocused || !!value;
-    const bad = !!err && key !== "code";
+    const bad = !!err;
     return {
       value,
       isFocused,
@@ -64,14 +73,9 @@ export default function AdminLoginPage() {
     setPw(e.target.value);
     setErr("");
   }
-  function onCodeChange(e: ChangeEvent<HTMLInputElement>) {
-    setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
-    setErr("");
-  }
 
   const emailField = field("email");
   const pwField = field("pw");
-  const codeField = field("code");
 
   return (
     <div
@@ -165,40 +169,6 @@ export default function AdminLoginPage() {
                 </div>
               </div>
 
-              <div>
-                <div className="relative">
-                  <input
-                    id="al-code"
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="2FA code (optional)"
-                    value={codeField.value}
-                    onChange={onCodeChange}
-                    onFocus={codeField.onFocus}
-                    onBlur={codeField.onBlur}
-                    style={{
-                      borderColor: codeField.border,
-                      boxShadow: codeField.ring,
-                      letterSpacing: code ? "0.3em" : "normal",
-                    }}
-                    className="h-[60px] w-full rounded-xl border bg-white px-4 pb-2 pt-6 text-base text-[#141414] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-transparent"
-                  />
-                  <label
-                    htmlFor="al-code"
-                    style={{
-                      top: codeField.labelTop,
-                      fontSize: codeField.labelSize,
-                      color: codeField.labelColor,
-                    }}
-                    className="pointer-events-none absolute left-[17px] transition-all duration-150 ease-in-out"
-                  >
-                    2FA code (optional)
-                  </label>
-                </div>
-                <div className="ml-1 mt-1.5 text-[13px] text-[#6B6B6B]">
-                  Only if two-factor sign-in is on for your account
-                </div>
-              </div>
             </div>
 
             {err && (
@@ -208,7 +178,7 @@ export default function AdminLoginPage() {
               </div>
             )}
 
-            <button type="submit" className={`mt-7 ${btn}`}>
+            <button type="submit" disabled={loading} className={`mt-7 ${btn}`}>
               {loading ? (
                 <>
                   <span className="inline-block h-[18px] w-[18px] animate-[hwSpin_0.7s_linear_infinite] rounded-full border-2 border-white/35 border-t-white" />
