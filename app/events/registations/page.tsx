@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import Script from "next/script";
+import { QRCodeSVG } from "qrcode.react";
 import {
   useEffect,
   useState,
@@ -65,43 +66,6 @@ const MASK: Partial<Record<FieldKey, (v: string) => string>> = {
 };
 
 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN");
-
-function hashSeed(str: string): number {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (h * 31 + str.charCodeAt(i)) >>> 0;
-  }
-  return h || 1;
-}
-
-function buildQr(seed: number): string {
-  const N = 29;
-  let s = seed;
-  let d = "";
-  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let y = 0; y < N; y++) {
-    for (let x = 0; x < N; x++) {
-      const ox = x < 8 ? 0 : x >= N - 8 ? N - 7 : null;
-      const oy = y < 8 ? 0 : y >= N - 8 ? N - 7 : null;
-      const inFinder = ox !== null && oy !== null && !(ox && oy);
-      let dark: boolean;
-      if (inFinder) {
-        const fx = x - (ox as number);
-        const fy = y - (oy as number);
-        dark =
-          fx >= 0 &&
-          fy >= 0 &&
-          fx < 7 &&
-          fy < 7 &&
-          (fx === 0 || fx === 6 || fy === 0 || fy === 6 || (fx > 1 && fx < 5 && fy > 1 && fy < 5));
-      } else {
-        dark = r() < 0.47;
-      }
-      if (dark) d += `M${x} ${y}h1v1h-1z`;
-    }
-  }
-  return d;
-}
 
 function downloadIcs(event: EventInfo | null) {
   if (!event) return;
@@ -402,7 +366,6 @@ export default function RegisterPage() {
   const steps = ["Details", "Tickets", "Payment"];
 
   if (step === 3 && ticketResult) {
-    const qr = buildQr(hashSeed(ticketResult.ticketCode));
     const who = values.fullName || user?.email || "";
     const when = ticketResult.startsAt
       ? new Date(ticketResult.startsAt).toLocaleString("en-IN", {
@@ -478,10 +441,8 @@ export default function RegisterPage() {
               <span className="absolute -right-[11px] -top-[11px] h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
             </div>
             <div className="flex flex-wrap items-center gap-6 bg-[#FAF7F5] px-7 py-6">
-              <div className="h-[132px] w-[132px] rounded-lg border border-[#EDE6E3] bg-white p-2.5">
-                <svg viewBox="0 0 29 29" shapeRendering="crispEdges" className="block h-full w-full">
-                  <path d={qr} fill="#141414" />
-                </svg>
+              <div className="flex h-[132px] w-[132px] items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-2.5">
+                <QRCodeSVG value={ticketResult.ticketCode} size={112} />
               </div>
               <div className="flex-1 basis-[200px] text-sm leading-relaxed text-[#6B6B6B]">
                 Show this code at the entrance.

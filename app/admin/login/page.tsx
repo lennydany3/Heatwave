@@ -43,7 +43,7 @@ export default function AdminLoginPage() {
       setErr(error.message);
       return;
     }
-    router.push("/admin");
+    router.push("/admin/dashboard");
   }
 
   function field(key: FieldKey) {

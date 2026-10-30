@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { createClient } from "@/utils/supabase/client";
@@ -47,36 +48,6 @@ function relativeWhen(iso: string | null): string {
   if (days <= 0) return "today";
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
-}
-
-function qrPath(seed: string): string {
-  let hashed = 0;
-  for (let i = 0; i < seed.length; i++) hashed = (hashed * 31 + seed.charCodeAt(i)) >>> 0;
-  let s = hashed || 1;
-  const N = 29;
-  let d = "";
-  const r = () => (s = (s * 16807) % 2147483647) / 2147483647;
-  for (let y = 0; y < N; y++) {
-    for (let x = 0; x < N; x++) {
-      const ox = x < 8 ? 0 : x >= N - 8 ? N - 7 : null;
-      const oy = y < 8 ? 0 : y >= N - 8 ? N - 7 : null;
-      let dark: boolean;
-      if (ox !== null && oy !== null && !(ox && oy)) {
-        const fx = x - ox;
-        const fy = y - oy;
-        dark =
-          fx >= 0 &&
-          fy >= 0 &&
-          fx < 7 &&
-          fy < 7 &&
-          (fx === 0 || fx === 6 || fy === 0 || fy === 6 || (fx > 1 && fx < 5 && fy > 1 && fy < 5));
-      } else {
-        dark = r() < 0.47;
-      }
-      if (dark) d += `M${x} ${y}h1v1h-1z`;
-    }
-  }
-  return d;
 }
 
 function PlaceholderThumb({ className = "" }: { className?: string }) {
@@ -377,10 +348,8 @@ export default function DashboardPage() {
               <div className="relative flex flex-none flex-col items-center justify-center gap-3 border-t border-dashed border-[#E0D6D2] bg-[#FAF7F5] p-7 lg:w-[260px] lg:border-l lg:border-t-0">
                 <span className="absolute -left-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
                 <span className="absolute -right-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white lg:-bottom-3 lg:-left-3 lg:right-auto lg:top-auto" />
-                <div className="h-40 w-40 rounded-lg border border-[#EDE6E3] bg-white p-3">
-                  <svg viewBox="0 0 29 29" shapeRendering="crispEdges" className="block h-full w-full">
-                    <path d={qrPath(hl.bid)} fill="#141414" />
-                  </svg>
+                <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3">
+                  <QRCodeSVG value={hl.bid} size={136} />
                 </div>
                 <div className="text-center text-xs text-[#6B6B6B]">Scan at entry</div>
               </div>
@@ -528,10 +497,8 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-wrap">
               <div className="flex flex-1 basis-[280px] flex-col items-center gap-4 border-r border-[#EDE6E3] bg-[#FAF7F5] p-7">
-                <div className="aspect-square w-full max-w-[240px] rounded-xl border border-[#EDE6E3] bg-white p-4">
-                  <svg viewBox="0 0 29 29" shapeRendering="crispEdges" className="block h-full w-full">
-                    <path d={qrPath(cur.bid)} fill="#141414" />
-                  </svg>
+                <div className="flex aspect-square w-full max-w-[240px] items-center justify-center rounded-xl border border-[#EDE6E3] bg-white p-4">
+                  <QRCodeSVG value={cur.bid} size={192} />
                 </div>
                 <div className="text-center">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">BOOKING ID</div>
