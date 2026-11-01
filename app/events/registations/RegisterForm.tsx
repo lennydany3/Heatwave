@@ -700,27 +700,61 @@ export default function RegisterForm({
     return (
       <Page>
         <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
-          <div className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#E5251B]">
-            <svg width="44" height="44" viewBox="0 0 24 24">
-              <path
-                d="M5 12.5l4.5 4.5L19 7.5"
-                fill="none"
-                stroke="#fff"
-                strokeWidth="2.6"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+          <div className="relative flex h-24 w-24 items-center justify-center">
+            <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.35s_both] rounded-full bg-[#E5251B]" />
+            <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.6s_both] rounded-full bg-[#E5251B]" />
+            {[
+              ["-130px", "-90px", "200deg", "#E5251B"],
+              ["-80px", "-130px", "-160deg", "#F5A623"],
+              ["-20px", "-150px", "240deg", "#141414"],
+              ["50px", "-140px", "-220deg", "#E5251B"],
+              ["110px", "-100px", "180deg", "#F5A623"],
+              ["140px", "-30px", "-200deg", "#141414"],
+              ["-145px", "-25px", "260deg", "#F5A623"],
+              ["120px", "50px", "-240deg", "#E5251B"],
+              ["-110px", "60px", "220deg", "#141414"],
+              ["-40px", "95px", "-180deg", "#E5251B"],
+              ["40px", "100px", "200deg", "#F5A623"],
+              ["0px", "-120px", "300deg", "#E5251B"],
+            ].map(([dx, dy, rot, color], i) => (
+              <span
+                key={i}
+                className="hw-celebrate pointer-events-none absolute left-1/2 top-1/2 -ml-1 -mt-1.5 h-3 w-2 animate-[hwBurst_1.1s_cubic-bezier(.2,.8,.3,1)_both] rounded-[2px]"
+                style={
+                  {
+                    "--dx": dx,
+                    "--dy": dy,
+                    "--rot": rot,
+                    backgroundColor: color,
+                    animationDelay: `${0.3 + (i % 4) * 0.03}s`,
+                  } as React.CSSProperties
+                }
               />
-            </svg>
+            ))}
+            <div className="relative flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#E5251B]">
+              <svg width="44" height="44" viewBox="0 0 24 24">
+                <path
+                  d="M5 12.5l4.5 4.5L19 7.5"
+                  fill="none"
+                  stroke="#fff"
+                  strokeWidth="2.6"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeDasharray="30"
+                  className="animate-[hwDraw_0.45s_ease-out_0.35s_both]"
+                />
+              </svg>
+            </div>
           </div>
-          <h1 className="m-0 mt-7 text-[48px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[72px]">
+          <h1 className="m-0 mt-7 animate-[hwUp_0.6s_ease-out_0.45s_both] text-[48px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[72px]">
             You&apos;re in!
           </h1>
-          <p className="mt-3.5 text-[17px] leading-relaxed text-[#6B6B6B]">
+          <p className="mt-3.5 animate-[hwUp_0.6s_ease-out_0.6s_both] text-[17px] leading-relaxed text-[#6B6B6B]">
             We&apos;ve received your payment details. Your ticket is below and in{" "}
             <span className="font-medium text-[#141414]">My Tickets</span>.
           </p>
 
-          <div className="mt-6 flex w-full items-start gap-3 rounded-xl bg-[#FFF6E5] px-5 py-4 text-left text-sm leading-relaxed text-[#8A5A00]">
+          <div className="mt-6 flex w-full animate-[hwUp_0.6s_ease-out_0.75s_both] items-start gap-3 rounded-xl bg-[#FFF6E5] px-5 py-4 text-left text-sm leading-relaxed text-[#8A5A00]">
             <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#D99A1E]" />
             <span>
               <span className="font-bold">Payment verification pending.</span> We&apos;ll match UPI
@@ -729,7 +763,7 @@ export default function RegisterForm({
             </span>
           </div>
 
-          <div className="mt-6 w-full overflow-hidden rounded-xl border border-[#EDE6E3] bg-white text-left">
+          <div className="mt-6 w-full animate-[hwUp_0.7s_ease-out_0.9s_both] overflow-hidden rounded-xl border border-[#EDE6E3] bg-white text-left">
             <div className="px-7 py-6">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">E-TICKET</div>
