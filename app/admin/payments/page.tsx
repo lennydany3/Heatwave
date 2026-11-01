@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import HeatwaveLoader from "@/components/HeatwaveLoader";
 import { fmt } from "../_lib/data";
+import { Avatar, Chips, Empty, PageHeader, Panel, PanelHead, Pill, StatCard, StatGrid } from "../_components/ui";
 
 type PayStatus = "Paid" | "Pending" | "Failed";
 type Txn = {
@@ -96,53 +97,43 @@ export default function AdminPaymentsPage() {
 
   return (
     <AdminShell active="payments" search={q} onSearchChange={setQ}>
-      <div>
-        <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">PAYMENTS</div>
-        <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-          Transactions
-        </h1>
-      </div>
+      <PageHeader eyebrow="PAYMENTS" title="Transactions" />
 
-      <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <StatGrid three>
         {[
           { l: "COLLECTED", v: money(collected), n: `${txns.filter((t) => t.st === "Paid").length} paid` },
           { l: "PENDING", v: money(pending), n: `${txns.filter((t) => t.st === "Pending").length} awaiting verification` },
           { l: "FAILED", v: String(failedCount), n: "attempts" },
-        ].map((k) => (
-          <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">
-            <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">{k.l}</div>
-            <div className="mt-2.5 text-[30px] font-black tracking-[-0.035em] tabular-nums">{k.v}</div>
-            <div className="mt-1.5 text-[13px] text-[#6B6B6B]">{k.n}</div>
-          </div>
+        ].map((k, i) => (
+          <StatCard
+            key={k.l}
+            index={i}
+            dark={i === 0}
+            wide={i === 0}
+            label={k.l}
+            value={k.v}
+            note={k.n}
+            dot={i === 0 ? undefined : PAY_BADGE[i === 1 ? "Pending" : "Failed"][2]}
+            loading={loading}
+          />
         ))}
-      </div>
+      </StatGrid>
 
-      <section className="mt-5 rounded-xl border border-[#EDE6E3]">
-        <div className="flex flex-wrap items-center justify-between gap-3.5 px-6 py-4.5">
-          <div className="text-[17px] font-bold">All transactions</div>
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((l) => {
-              const on = filter === l;
-              return (
-                <button
-                  key={l}
-                  onClick={() => setFilter(l)}
-                  style={{
-                    background: on ? "#141414" : "#fff",
-                    color: on ? "#fff" : "#6B6B6B",
-                    borderColor: on ? "#141414" : "#EDE6E3",
-                  }}
-                  className="rounded-full border px-3.5 py-1.5 text-[13px] font-bold"
-                >
-                  {l}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <Panel className="mt-3 sm:mt-5">
+        <PanelHead title="All transactions">
+          <Chips
+            options={FILTERS.map((l) => ({
+              id: l,
+              label: l,
+              count: l === "All" ? txns.length : txns.filter((t) => t.st === l).length,
+            }))}
+            value={filter}
+            onChange={setFilter}
+          />
+        </PanelHead>
 
         {loading && (
-          <div className="px-6 py-16">
+          <div className="border-t border-[#EDE6E3] px-6 py-16">
             <HeatwaveLoader label="Loading transactions" />
           </div>
         )}
@@ -156,80 +147,71 @@ export default function AdminPaymentsPage() {
                 <span className="text-right">AMOUNT</span>
                 <span>STATUS</span>
               </div>
-              {rows.map((r) => {
-                const b = PAY_BADGE[r.st];
-                return (
-                  <div
-                    key={r.id}
-                    className="grid grid-cols-[1fr_1.5fr_.8fr_.8fr] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3.5 text-sm transition-colors hover:bg-[#FCFAF9]"
-                  >
-                    <div>
-                      <div className="font-bold tabular-nums">{r.tx}</div>
-                      <div className="text-xs text-[#6B6B6B]">
-                        {r.date} · {r.time}
-                      </div>
+              {rows.map((r) => (
+                <div
+                  key={r.id}
+                  className="grid grid-cols-[1fr_1.5fr_.8fr_.8fr] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3.5 text-sm transition-colors last:border-b-0 hover:bg-[#FCFAF9]"
+                >
+                  <div>
+                    <div className="font-bold tabular-nums">{r.tx}</div>
+                    <div className="text-xs text-[#6B6B6B]">
+                      {r.date} · {r.time}
                     </div>
+                  </div>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={r.name} size={32} />
                     <div className="min-w-0">
                       <div className="truncate font-bold">{r.name}</div>
                       <div className="truncate text-xs text-[#6B6B6B]">{r.event}</div>
                     </div>
-                    <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
-                    <div>
-                      <span
-                        className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                        style={{ background: b[0], color: b[1] }}
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                        {r.st}
-                      </span>
-                    </div>
                   </div>
-                );
-              })}
+                  <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
+                  <div>
+                    <Pill tone={PAY_BADGE[r.st]}>{r.st}</Pill>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div className="border-t border-[#EDE6E3] lg:hidden">
-              {rows.map((r) => {
-                const b = PAY_BADGE[r.st];
-                return (
-                  <div key={r.id} className="flex flex-col gap-1.5 border-b border-[#EDE6E3] px-5 py-4">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-bold">{r.name}</span>
-                      <span className="font-black">{money(r.amount)}</span>
+            <div className="lg:hidden">
+              {rows.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 border-t border-[#EDE6E3] px-4 py-3.5">
+                  <Avatar name={r.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[15px] font-bold">{r.name}</div>
+                    <div className="truncate text-[12.5px] tabular-nums text-[#6B6B6B]">
+                      {r.tx} · {r.date}, {r.time}
                     </div>
-                    <div className="text-[13px] text-[#6B6B6B]">
-                      {r.tx} · {r.event}
-                    </div>
-                    <span
-                      className="inline-flex w-fit items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                      style={{ background: b[0], color: b[1] }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                      {r.st}
-                    </span>
                   </div>
-                );
-              })}
+                  <div className="flex flex-none flex-col items-end gap-1.5">
+                    <span className="text-sm font-black tabular-nums">{money(r.amount)}</span>
+                    <Pill tone={PAY_BADGE[r.st]}>{r.st}</Pill>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {rows.length === 0 && (
-              <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-                <div className="text-lg font-bold">No transactions here</div>
-                <div className="mt-1.5 text-sm text-[#6B6B6B]">Nothing matches this filter yet.</div>
-                <button
-                  onClick={() => {
-                    setFilter("All");
-                    setQ("");
-                  }}
-                  className="mt-4 text-sm font-bold text-[#E5251B]"
-                >
-                  Show all
-                </button>
-              </div>
+              <Empty
+                title="No transactions here"
+                action={
+                  <button
+                    onClick={() => {
+                      setFilter("All");
+                      setQ("");
+                    }}
+                    className="mt-4 text-sm font-bold text-[#E5251B]"
+                  >
+                    Show all
+                  </button>
+                }
+              >
+                Nothing matches this filter yet.
+              </Empty>
             )}
           </>
         )}
-      </section>
+      </Panel>
     </AdminShell>
   );
 }

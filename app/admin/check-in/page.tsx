@@ -3,6 +3,7 @@
 import jsQR from "jsqr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
+import { Avatar, Empty, PageHeader, Panel, PanelHead, Pill, RED_BUTTON, Toast } from "../_components/ui";
 
 type EventInfo = { id: string; name: string; venue: string | null; starts_at: string | null };
 
@@ -242,86 +243,95 @@ export default function AdminCheckInPage() {
 
   return (
     <AdminShell active="checkin" search={q} onSearchChange={setQ}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-            ATTENDEES &amp; CHECK-IN
-          </div>
-          <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-            {event?.name ?? "Loading…"}
-          </h1>
-          {event && (
-            <div className="mt-2 text-sm text-[#6B6B6B]">
-              {event.starts_at &&
-                new Date(event.starts_at).toLocaleString("en-IN", {
-                  weekday: "short",
-                  day: "numeric",
-                  month: "short",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              {event.venue ? ` · ${event.venue}` : ""}
-            </div>
-          )}
-        </div>
-        {!has("export") && (
-          <button
-            onClick={exportCsv}
-            disabled={tickets.length === 0}
-            className="inline-flex h-11 items-center rounded-full border border-[#141414] px-5 text-sm font-bold hover:bg-[#FAF7F5] disabled:opacity-40"
-          >
-            Export CSV
-          </button>
+      <PageHeader
+        eyebrow="ATTENDEES & CHECK-IN"
+        title={event?.name ?? "Loading…"}
+        action={
+          !has("export") && (
+            <button
+              onClick={exportCsv}
+              disabled={tickets.length === 0}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-full border border-[#141414] bg-white px-5 text-sm font-bold transition hover:bg-[#141414] hover:text-white disabled:opacity-40 disabled:hover:bg-white disabled:hover:text-[#141414] sm:w-auto"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+                <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
+              </svg>
+              Export CSV
+            </button>
+          )
+        }
+      >
+        {event && (
+          <>
+            {event.starts_at &&
+              new Date(event.starts_at).toLocaleString("en-IN", {
+                weekday: "short",
+                day: "numeric",
+                month: "short",
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            {event.venue ? ` · ${event.venue}` : ""}
+          </>
         )}
-      </div>
+      </PageHeader>
 
-      <div className="mt-7 flex flex-wrap items-start gap-5">
-        <div className="flex min-w-0 flex-1 basis-[320px] flex-col gap-4">
-          <div className="flex items-center gap-5.5 rounded-xl border border-[#EDE6E3] p-5.5">
-            <div className="relative h-[124px] w-[124px] flex-none">
+      <div className="mt-6 flex flex-wrap items-start gap-3 sm:mt-8 sm:gap-5">
+        <div className="flex min-w-0 flex-1 basis-[320px] flex-col gap-3 sm:gap-4">
+          <div className="relative flex items-center gap-5 overflow-hidden rounded-2xl bg-[#141414] p-4 text-white shadow-[0_16px_32px_-18px_rgba(20,20,20,.7)] sm:p-5">
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-12 -top-16 h-44 w-44 rounded-full bg-[#E5251B] opacity-45 blur-3xl"
+            />
+            <div className="relative h-[96px] w-[96px] flex-none sm:h-[116px] sm:w-[116px]">
               <svg viewBox="0 0 124 124" className="h-full w-full -rotate-90">
-                <circle cx="62" cy="62" r="52" fill="none" stroke="#F3EEEB" strokeWidth={8} />
+                <circle cx="62" cy="62" r="52" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth={9} />
                 <circle
                   cx="62"
                   cy="62"
                   r="52"
                   fill="none"
                   stroke="#E5251B"
-                  strokeWidth={8}
+                  strokeWidth={9}
                   strokeLinecap="round"
                   strokeDasharray={dash}
                   className="transition-[stroke-dasharray] duration-600 ease-out"
+                  style={{ filter: "drop-shadow(0 0 6px rgba(229,37,27,.7))" }}
                 />
               </svg>
-              <div className="absolute inset-0 flex items-center justify-center text-[22px] font-black tracking-[-0.02em]">
+              <div className="absolute inset-0 flex items-center justify-center text-[20px] font-black tracking-[-0.02em] sm:text-[22px]">
                 {Math.round(pct * 100)}%
               </div>
             </div>
-            <div>
-              <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
-                CHECKED IN
-              </div>
-              <div className="mt-1.5 text-[36px] font-black leading-[1] tracking-[-0.035em] tabular-nums">
+            <div className="relative">
+              <div className="text-[10px] font-bold tracking-[0.14em] text-white/55 sm:text-[11px]">CHECKED IN</div>
+              <div className="mt-1.5 text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums sm:text-[38px]">
                 {inCount.toLocaleString("en-IN")}
-                <span className="text-lg font-medium text-[#6B6B6B]"> / {soldCount.toLocaleString("en-IN")}</span>
+                <span className="text-lg font-medium text-white/45"> / {soldCount.toLocaleString("en-IN")}</span>
               </div>
-              <div className="mt-2 flex items-center gap-1.5 text-[13px] text-[#6B6B6B]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#3F8A5A]" />
+              <div className="mt-2.5 inline-flex items-center gap-1.5 rounded-full bg-white/10 px-2.5 py-1 text-[12px] font-bold text-white/80">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="absolute inset-0 animate-[hwRing_1.6s_ease-out_infinite] rounded-full bg-[#6FBF8A]" />
+                  <span className="relative h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
+                </span>
                 Live
               </div>
             </div>
           </div>
 
-          <div className="rounded-xl border border-[#EDE6E3] p-5.5">
-            <div className="flex items-center justify-between">
-              <div className="text-[17px] font-bold">Scan tickets</div>
+          <Panel className="p-3 sm:p-5">
+            <div className="flex items-center justify-between px-1 pt-1 sm:px-0 sm:pt-0">
+              <div className="text-[16px] font-bold sm:text-[17px]">Scan tickets</div>
               {scanning && (
-                <button onClick={stopCamera} className="text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]">
+                <button
+                  onClick={stopCamera}
+                  className="h-8 rounded-full bg-[#F3EEEB] px-3.5 text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
+                >
                   Stop
                 </button>
               )}
             </div>
-            <div className="relative mt-3.5 aspect-square overflow-hidden rounded-xl bg-[#141414]">
+            <div className="relative mt-3 aspect-square overflow-hidden rounded-2xl bg-[#141414] sm:mt-3.5">
               <video
                 ref={videoRef}
                 muted
@@ -332,38 +342,50 @@ export default function AdminCheckInPage() {
               <canvas ref={canvasRef} className="hidden" />
               {scanning && (
                 <>
-                  <div className="pointer-events-none absolute inset-[18%] rounded-xl shadow-[0_0_0_999px_rgba(20,20,20,.45)]" />
-                  <span className="pointer-events-none absolute left-[16%] top-[16%] h-7 w-7 rounded-tl-md border-l-2 border-t-2 border-white" />
-                  <span className="pointer-events-none absolute right-[16%] top-[16%] h-7 w-7 rounded-tr-md border-r-2 border-t-2 border-white" />
-                  <span className="pointer-events-none absolute bottom-[16%] left-[16%] h-7 w-7 rounded-bl-md border-b-2 border-l-2 border-white" />
-                  <span className="pointer-events-none absolute bottom-[16%] right-[16%] h-7 w-7 rounded-br-md border-b-2 border-r-2 border-white" />
-                  <div className="pointer-events-none absolute left-[12%] right-[12%] h-0.5 animate-[hwScan_2.4s_ease-in-out_infinite_alternate] rounded-sm bg-[#E5251B] shadow-[0_0_12px_rgba(229,37,27,.6)]" />
+                  <div className="pointer-events-none absolute inset-[18%] rounded-2xl shadow-[0_0_0_999px_rgba(20,20,20,.5)]" />
+                  <span className="pointer-events-none absolute left-[16%] top-[16%] h-8 w-8 rounded-tl-xl border-l-[3px] border-t-[3px] border-white" />
+                  <span className="pointer-events-none absolute right-[16%] top-[16%] h-8 w-8 rounded-tr-xl border-r-[3px] border-t-[3px] border-white" />
+                  <span className="pointer-events-none absolute bottom-[16%] left-[16%] h-8 w-8 rounded-bl-xl border-b-[3px] border-l-[3px] border-white" />
+                  <span className="pointer-events-none absolute bottom-[16%] right-[16%] h-8 w-8 rounded-br-xl border-b-[3px] border-r-[3px] border-white" />
+                  <div className="pointer-events-none absolute left-[12%] right-[12%] h-0.5 animate-[hwScan_2.4s_ease-in-out_infinite_alternate] rounded-sm bg-[#E5251B] shadow-[0_0_14px_rgba(229,37,27,.8)]" />
                 </>
               )}
               {!scanning && (
                 <button
                   onClick={startCamera}
-                  className="absolute inset-0 flex items-center justify-center text-sm font-bold text-white/90 hover:text-white"
+                  className="group absolute inset-0 flex flex-col items-center justify-center gap-4 text-white"
                 >
-                  Tap to start camera
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute left-1/2 top-1/2 h-48 w-48 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#E5251B] opacity-25 blur-3xl"
+                  />
+                  <span className="relative flex h-20 w-20 items-center justify-center">
+                    <span className="absolute inset-0 animate-[hwRing_2s_ease-out_infinite] rounded-full border-2 border-[#E5251B]" />
+                    <span className="relative flex h-20 w-20 items-center justify-center rounded-full bg-[#E5251B] shadow-[0_10px_30px_-6px_rgba(229,37,27,.8)] transition-transform group-active:scale-95">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8" aria-hidden>
+                        <path d="M4 8V5.5A1.5 1.5 0 015.5 4H8M16 4h2.5A1.5 1.5 0 0120 5.5V8M20 16v2.5a1.5 1.5 0 01-1.5 1.5H16M8 20H5.5A1.5 1.5 0 014 18.5V16M4 12h16" />
+                      </svg>
+                    </span>
+                  </span>
+                  <span className="relative text-sm font-bold text-white/90 group-hover:text-white">Tap to start camera</span>
                 </button>
               )}
             </div>
-            {cameraError && (
-              <div className="mt-3 text-[13px] text-[#C8372D]">{cameraError}</div>
-            )}
+            {cameraError && <div className="mt-3 px-1 text-[13px] text-[#C8372D]">{cameraError}</div>}
 
-            <div className="mt-3.5 flex gap-2">
+            <div className="mt-3 flex gap-2 sm:mt-3.5">
               <input
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && doLookup(manualCode)}
+                autoCapitalize="characters"
+                enterKeyHint="search"
                 placeholder="Or type Booking ID — HW-27-XXXXX"
-                className="h-11 flex-1 rounded-full border border-[#EDE6E3] bg-white px-4 text-sm outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
+                className="h-12 min-w-0 flex-1 rounded-full border border-[#EDE6E3] bg-white px-4 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)] sm:h-11 sm:text-sm"
               />
               <button
                 onClick={() => doLookup(manualCode)}
-                className="h-11 flex-none rounded-full border border-[#141414] px-4 text-sm font-bold hover:bg-[#FAF7F5]"
+                className="h-12 flex-none rounded-full bg-[#141414] px-5 text-sm font-bold text-white transition active:scale-[.97] sm:h-11"
               >
                 Look up
               </button>
@@ -371,7 +393,7 @@ export default function AdminCheckInPage() {
 
             {lookup && (
               <div
-                className="mt-3.5 animate-[hwUp_0.25s_ease_both] rounded-xl p-3.5"
+                className="mt-3 animate-[hwUp_0.25s_ease_both] rounded-2xl border p-4"
                 style={{
                   background:
                     lookup.kind === "ready"
@@ -381,17 +403,25 @@ export default function AdminCheckInPage() {
                         : lookup.kind === "payment-pending"
                           ? "#FFF6E5"
                           : "#FDECEA",
+                  borderColor:
+                    lookup.kind === "ready"
+                      ? "#CFE3D4"
+                      : lookup.kind === "already"
+                        ? "#EDE6E3"
+                        : lookup.kind === "payment-pending"
+                          ? "#F2DDB0"
+                          : "#F3C9C5",
                 }}
               >
                 {lookup.kind === "not-found" && (
                   <>
-                    <div className="text-[15px] font-bold text-[#B71C14]">Ticket not found</div>
+                    <div className="text-[16px] font-bold text-[#B71C14]">Ticket not found</div>
                     <div className="mt-1 text-[13px] text-[#6B6B6B]">{lookup.code}</div>
                   </>
                 )}
                 {lookup.kind === "cancelled" && (
                   <>
-                    <div className="text-[15px] font-bold text-[#B71C14]">
+                    <div className="text-[16px] font-bold text-[#B71C14]">
                       {lookup.ticket.registrations?.full_name ?? lookup.ticket.ticket_code}
                     </div>
                     <div className="mt-1 text-[13px] text-[#6B6B6B]">This ticket was cancelled</div>
@@ -400,29 +430,28 @@ export default function AdminCheckInPage() {
                 {lookup.kind === "payment-pending" && (
                   <>
                     <div className="flex items-center gap-2 text-[15px] font-bold text-[#8A5A00]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#D99A1E]" />
+                      <span className="h-2 w-2 flex-none rounded-full bg-[#D99A1E]" />
                       Payment verification pending — do not admit
                     </div>
                     <div className="mt-1 text-[13px] text-[#141414]">
                       {lookup.ticket.registrations?.full_name} · {lookup.ticket.ticket_code}
                     </div>
-                    <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-[13px] text-[#8A5A00]">
+                    <div className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[13px] text-[#8A5A00]">
                       <span className="font-bold">Reason:</span>{" "}
-                      {lookup.ticket.registrations?.verification_note ||
-                        "Payment hasn't been verified yet"}
+                      {lookup.ticket.registrations?.verification_note || "Payment hasn't been verified yet"}
                     </div>
                   </>
                 )}
                 {lookup.kind === "payment-failed" && (
                   <>
                     <div className="flex items-center gap-2 text-[15px] font-bold text-[#B71C14]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#E5251B]" />
+                      <span className="h-2 w-2 flex-none rounded-full bg-[#E5251B]" />
                       Payment failed — do not admit
                     </div>
                     <div className="mt-1 text-[13px] text-[#141414]">
                       {lookup.ticket.registrations?.full_name} · {lookup.ticket.ticket_code}
                     </div>
-                    <div className="mt-2 rounded-lg bg-white/70 px-3 py-2 text-[13px] text-[#B71C14]">
+                    <div className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[13px] text-[#B71C14]">
                       <span className="font-bold">Reason:</span>{" "}
                       {lookup.ticket.registrations?.verification_note || "Payment was rejected"}
                     </div>
@@ -430,7 +459,7 @@ export default function AdminCheckInPage() {
                 )}
                 {lookup.kind === "already" && (
                   <>
-                    <div className="text-[15px] font-bold text-[#141414]">
+                    <div className="text-[16px] font-bold text-[#141414]">
                       {lookup.ticket.registrations?.full_name ?? lookup.ticket.ticket_code}
                     </div>
                     <div className="mt-1 text-[13px] text-[#6B6B6B]">
@@ -446,88 +475,69 @@ export default function AdminCheckInPage() {
                 )}
                 {lookup.kind === "ready" && (
                   <>
-                    <div className="flex items-center gap-2 text-[15px] font-bold text-[#2F6B45]">
-                      <span className="h-1.5 w-1.5 rounded-full bg-[#3F8A5A]" />
+                    <div className="flex items-center gap-2 text-[16px] font-bold text-[#2F6B45]">
+                      <span className="h-2 w-2 flex-none rounded-full bg-[#3F8A5A]" />
                       {lookup.ticket.registrations?.full_name}
                     </div>
                     <div className="mt-1 text-[13px] text-[#6B6B6B]">
                       {lookup.ticket.registrations?.ticket_tiers?.name} · {lookup.ticket.ticket_code}
                     </div>
                     {has("approve") ? (
-                      <div className="mt-3 rounded-full border border-[#EDE6E3] px-4 py-2 text-center text-xs font-bold text-[#6B6B6B]">
+                      <div className="mt-3 rounded-full border border-[#EDE6E3] bg-white px-4 py-2 text-center text-xs font-bold text-[#6B6B6B]">
                         View only — you can&apos;t check people in
                       </div>
                     ) : (
-                    <button
-                      onClick={approve}
-                      disabled={approving}
-                      className="mt-3 flex h-10 w-full items-center justify-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right text-sm font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left disabled:opacity-60"
-                    >
-                      {approving ? "Approving…" : "Approve check-in"}
-                    </button>
+                      <button
+                        onClick={approve}
+                        disabled={approving}
+                        className={`mt-3 flex h-12 w-full items-center justify-center rounded-full text-[15px] font-bold disabled:opacity-60 ${RED_BUTTON}`}
+                      >
+                        {approving ? "Approving…" : "Approve check-in"}
+                      </button>
                     )}
                   </>
                 )}
               </div>
             )}
-          </div>
+          </Panel>
         </div>
 
-        <div className="min-w-0 flex-[2_1_460px] overflow-hidden rounded-xl border border-[#EDE6E3]">
-          <div className="flex flex-wrap items-center justify-between gap-3 px-5.5 py-4.5">
-            <div className="text-[17px] font-bold">Attendees</div>
-            <div className="text-[13px] text-[#6B6B6B]">
-              {loading ? "Loading…" : `Showing ${list.length} · use search above to filter`}
-            </div>
-          </div>
+        <Panel className="min-w-0 flex-[2_1_460px]">
+          <PanelHead
+            title="Attendees"
+            sub={loading ? "Loading…" : `Showing ${list.length} · use search above to filter`}
+          />
           {list.map((t) => {
             const name = t.registrations?.full_name ?? "—";
-            const initials = name
-              .split(" ")
-              .map((w) => w[0])
-              .join("")
-              .slice(0, 2);
             return (
               <div
                 key={t.id}
-                className="flex items-center gap-3.5 border-t border-[#EDE6E3] px-5.5 py-3 transition-colors hover:bg-[#FCFAF9]"
+                className="flex items-center gap-3 border-t border-[#EDE6E3] px-4 py-3 transition-colors hover:bg-[#FCFAF9] sm:gap-3.5 sm:px-6"
               >
-                <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full border border-[#EDE6E3] bg-[#FAF7F5] text-xs font-bold text-[#6B6B6B]">
-                  {initials}
-                </span>
+                <Avatar name={name} size={38} dark={t.status === "checked_in"} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-[15px] font-bold">{name}</div>
                   <div className="truncate text-xs text-[#6B6B6B]">
-                    {t.registrations?.ticket_tiers?.name ?? "Ticket"} · {t.ticket_code} ·{" "}
-                    {t.registrations?.email}
+                    {t.registrations?.ticket_tiers?.name ?? "Ticket"} · {t.ticket_code}
+                    <span className="hidden sm:inline"> · {t.registrations?.email}</span>
                   </div>
                 </div>
                 {t.status === "checked_in" ? (
-                  <span className="whitespace-nowrap rounded-full bg-[#141414] px-2.5 py-0.5 text-xs font-bold text-white">
-                    Checked-in
-                  </span>
+                  <Pill tone={["#141414", "#FFFFFF", "#6FBF8A"]}>Checked-in</Pill>
                 ) : t.status === "cancelled" ? (
-                  <span className="whitespace-nowrap rounded-full bg-[#FDECEA] px-2.5 py-0.5 text-xs font-bold text-[#B71C14]">
-                    Cancelled
-                  </span>
+                  <Pill tone={["#FDECEA", "#B71C14", "#E5251B"]}>Cancelled</Pill>
                 ) : t.registrations?.status === "failed" ? (
-                  <span
-                    title={t.registrations.verification_note ?? undefined}
-                    className="whitespace-nowrap rounded-full bg-[#FDECEA] px-2.5 py-0.5 text-xs font-bold text-[#B71C14]"
-                  >
-                    Payment failed
+                  <span title={t.registrations.verification_note ?? undefined}>
+                    <Pill tone={["#FDECEA", "#B71C14", "#E5251B"]}>Payment failed</Pill>
                   </span>
                 ) : !isVerified(t) ? (
-                  <span
-                    title={t.registrations?.verification_note ?? undefined}
-                    className="whitespace-nowrap rounded-full bg-[#FFF6E5] px-2.5 py-0.5 text-xs font-bold text-[#8A5A00]"
-                  >
-                    Unverified
+                  <span title={t.registrations?.verification_note ?? undefined}>
+                    <Pill tone={["#FFF6E5", "#8A5A00", "#D99A1E"]}>Unverified</Pill>
                   </span>
                 ) : has("approve") ? null : (
                   <button
                     onClick={() => handleCheckIn(t)}
-                    className="h-8 whitespace-nowrap rounded-full border border-[#EDE6E3] px-3.5 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B]"
+                    className="h-9 flex-none whitespace-nowrap rounded-full border border-[#EDE6E3] bg-white px-3.5 text-[13px] font-bold transition hover:border-[#E5251B] hover:text-[#E5251B] active:scale-[.97]"
                   >
                     Check in
                   </button>
@@ -536,22 +546,12 @@ export default function AdminCheckInPage() {
             );
           })}
           {!loading && list.length === 0 && (
-            <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-              <div className="text-lg font-bold">No attendees found</div>
-              <div className="mt-1.5 text-sm text-[#6B6B6B]">
-                Check the spelling or search by booking ID.
-              </div>
-            </div>
+            <Empty title="No attendees found">Check the spelling or search by booking ID.</Empty>
           )}
-        </div>
+        </Panel>
       </div>
 
-      {toastMsg && (
-        <div className="fixed bottom-7 left-1/2 z-[80] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
-          {toastMsg}
-        </div>
-      )}
+      <Toast msg={toastMsg} />
     </AdminShell>
   );
 }

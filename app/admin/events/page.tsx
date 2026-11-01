@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { fmt } from "../_lib/data";
 import HeatwaveLoader from "@/components/HeatwaveLoader";
+import { Empty, PageHeader, Panel, Pill, Toast } from "../_components/ui";
 
 type TierStatus = "open" | "coming_soon" | "closed";
 
@@ -70,76 +71,74 @@ function TierCard({
 
   if (tier.status === "coming_soon") {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#FAF7F5] px-4 py-4">
-        <div>
-          <div className="text-[15px] font-bold">{tier.name}</div>
-          <div className="text-[13px] text-[#6B6B6B]">
+      <div className="flex flex-col gap-3 rounded-2xl border border-dashed border-[#E8DCD6] bg-[#FCFAF9] p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[15px] font-bold">{tier.name}</span>
+            <Pill tone={badge.c}>{badge.label}</Pill>
+          </div>
+          <div className="mt-1 text-[13px] text-[#6B6B6B]">
             Under development · shown as &ldquo;Announced soon&rdquo; on the event page
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-            style={{ background: badge.c[0], color: badge.c[1] }}
+        {canToggle && (
+          <button
+            onClick={() => onSave({ status: "open" })}
+            disabled={busy}
+            className="h-11 flex-none rounded-full bg-[#141414] px-5 text-[13px] font-bold text-white transition active:scale-[.98] disabled:opacity-35 sm:h-10"
           >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: badge.c[2] }} />
-            {badge.label}
-          </span>
-          {canToggle && (
-            <button
-              onClick={() => onSave({ status: "open" })}
-              disabled={busy}
-              className="h-9 rounded-full border border-[#EDE6E3] bg-white px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
-            >
-              Start sales
-            </button>
-          )}
-        </div>
+            Start sales
+          </button>
+        )}
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg bg-[#FAF7F5] px-4 py-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-        <div>
+    <div className="rounded-2xl border border-[#EDE6E3] bg-[#FCFAF9] p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <div className="text-[15px] font-bold">{tier.name}</div>
-          <div className="text-[13px] text-[#6B6B6B]">
+          <div className="mt-0.5 text-[13px] text-[#6B6B6B]">
             Female {price(tier.priceFemale, masks.includes("prices"))} · Male {price(tier.priceMale, masks.includes("prices"))}
           </div>
         </div>
-        <span
-          className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-          style={{ background: badge.c[0], color: badge.c[1] }}
-        >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: badge.c[2] }} />
-          {badge.label}
-        </span>
+        <Pill tone={badge.c}>{badge.label}</Pill>
       </div>
 
       <div className="mt-4">
-        <div className="flex flex-wrap justify-between gap-2 text-[13px]">
-          <span className="text-[#6B6B6B]">
+        <div className="flex items-end justify-between gap-3">
+          <div className="text-[13px] leading-snug text-[#6B6B6B]">
             <span className="font-bold text-[#2F6B45]">{tier.accepted}</span> accepted ·{" "}
-            <span className="font-bold text-[#8A5A00]">{tier.pending}</span> pending verification
+            <span className="font-bold text-[#8A5A00]">{tier.pending}</span> pending
             {tier.held > 0 && (
               <>
                 {" "}
                 · <span className="font-bold text-[#141414]">{tier.held}</span> held for waitlist
               </>
             )}
-          </span>
-          <span className="font-bold tabular-nums">
-            {tier.limit === null
-              ? "No limit"
-              : `${tier.remaining} of ${tier.limit} seats left`}
-          </span>
+          </div>
+          <div className="flex-none text-right">
+            {tier.limit === null ? (
+              <span className="text-sm font-bold">No limit</span>
+            ) : (
+              <>
+                <span className="text-[22px] font-black leading-none tracking-[-0.03em] tabular-nums">
+                  {tier.remaining}
+                </span>
+                <span className="text-[13px] font-bold text-[#6B6B6B]"> / {tier.limit} left</span>
+              </>
+            )}
+          </div>
         </div>
         {tier.limit !== null && (
-          <div className="mt-2 h-[4px] overflow-hidden rounded-full bg-[#EDE6E3]">
+          <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-[#EDE6E3]">
             <div
               className="h-full rounded-full transition-[width] duration-500"
-              style={{ width: pct + "%", background: tier.registrationClosed ? "#B71C14" : "#E5251B" }}
+              style={{
+                width: pct + "%",
+                background: tier.registrationClosed ? "#B71C14" : "linear-gradient(90deg,#FF7A45,#E5251B)",
+              }}
             />
           </div>
         )}
@@ -147,87 +146,79 @@ function TierCard({
 
       <div className="mt-4 border-t border-[#EDE6E3] pt-4">
         {canEditSeats && (
-          <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-            REGISTRATION SEATS
+          <>
+            <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">REGISTRATION SEATS</div>
+            <div className="no-scrollbar -mx-4 mt-2 flex gap-1.5 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0">
+              {[...QUICK_LIMITS.map(String), ""].map((n) => {
+                const on = draft === n;
+                return (
+                  <button
+                    key={n || "unlimited"}
+                    onClick={() => setDraft(n)}
+                    className={`h-9 flex-none rounded-full border px-3.5 text-[13px] font-bold transition-colors ${
+                      on
+                        ? "border-[#141414] bg-[#141414] text-white"
+                        : "border-[#EDE6E3] bg-white text-[#6B6B6B] hover:text-[#141414]"
+                    }`}
+                  >
+                    {n || "Unlimited"}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2.5 flex gap-2">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 5))}
+                inputMode="numeric"
+                placeholder="Custom, e.g. 40"
+                className="h-11 min-w-0 flex-1 rounded-xl border border-[#EDE6E3] bg-white px-3.5 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)] sm:max-w-[170px]"
+              />
+              <button
+                onClick={() => onSave({ seatLimit: parsed })}
+                disabled={busy || !dirty}
+                className="h-11 flex-none rounded-full bg-[#141414] px-5 text-[13px] font-bold text-white transition active:scale-[.98] disabled:opacity-30"
+              >
+                Save limit
+              </button>
+            </div>
+          </>
+        )}
+
+        {canToggle && (
+          <div className={`flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between ${canEditSeats ? "mt-4" : ""}`}>
+            <button
+              onClick={() => onSave({ status: "coming_soon" })}
+              disabled={busy}
+              className="order-2 h-9 text-left text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414] disabled:opacity-35 sm:order-1"
+            >
+              Set back to &ldquo;Coming soon&rdquo;
+            </button>
+            {tier.status === "open" && (
+              <button
+                onClick={() => onSave({ status: "closed" })}
+                disabled={busy}
+                className="order-1 h-11 rounded-full border border-[#F3C9C5] bg-white px-5 text-[13px] font-bold text-[#B71C14] transition-colors hover:bg-[#FDECEA] disabled:opacity-35 sm:order-2 sm:h-10"
+              >
+                Close registration
+              </button>
+            )}
+            {tier.status === "closed" && (
+              <button
+                onClick={() => onSave({ status: "open" })}
+                disabled={busy}
+                className="order-1 h-11 rounded-full bg-[#2F6B45] px-5 text-[13px] font-bold text-white disabled:opacity-35 sm:order-2 sm:h-10"
+              >
+                Reopen registration
+              </button>
+            )}
           </div>
         )}
-        <div className={canEditSeats ? "mt-2 flex flex-wrap gap-1.5" : "hidden"}>
-          {QUICK_LIMITS.map((n) => (
-            <button
-              key={n}
-              onClick={() => setDraft(String(n))}
-              style={{
-                background: draft === String(n) ? "#141414" : "#fff",
-                color: draft === String(n) ? "#fff" : "#6B6B6B",
-                borderColor: draft === String(n) ? "#141414" : "#EDE6E3",
-              }}
-              className="rounded-full border px-3 py-1 text-[13px] font-bold"
-            >
-              {n}
-            </button>
-          ))}
-          <button
-            onClick={() => setDraft("")}
-            style={{
-              background: draft === "" ? "#141414" : "#fff",
-              color: draft === "" ? "#fff" : "#6B6B6B",
-              borderColor: draft === "" ? "#141414" : "#EDE6E3",
-            }}
-            className="rounded-full border px-3 py-1 text-[13px] font-bold"
-          >
-            Unlimited
-          </button>
-        </div>
-        <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
-          {canEditSeats && (
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 5))}
-            inputMode="numeric"
-            placeholder="Custom, e.g. 40"
-            className="h-10 w-[150px] rounded-xl border border-[#EDE6E3] bg-white px-3.5 text-[15px] outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
-          />
-          )}
-          {canEditSeats && (
-          <button
-            onClick={() => onSave({ seatLimit: parsed })}
-            disabled={busy || !dirty}
-            className="h-10 rounded-full bg-[#141414] px-5 text-[13px] font-bold text-white disabled:opacity-35"
-          >
-            Save limit
-          </button>
-          )}
-          <span className="flex-1" />
-          {canToggle && tier.status === "open" && (
-            <button
-              onClick={() => onSave({ status: "closed" })}
-              disabled={busy}
-              className="h-10 rounded-full border border-[#F3C9C5] bg-white px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#FDECEA] disabled:opacity-35"
-            >
-              Close registration
-            </button>
-          )}
-          {canToggle && tier.status === "closed" && (
-            <button
-              onClick={() => onSave({ status: "open" })}
-              disabled={busy}
-              className="h-10 rounded-full bg-[#2F6B45] px-5 text-[13px] font-bold text-white disabled:opacity-35"
-            >
-              Reopen registration
-            </button>
-          )}
-        </div>
-        {canToggle && (
-          <button
-            onClick={() => onSave({ status: "coming_soon" })}
-            disabled={busy}
-            className="mt-3 block text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414] disabled:opacity-35"
-          >
-            Set back to &ldquo;Coming soon&rdquo;
-          </button>
-        )}
         {tier.waiting > 0 && (
-          <Link href="/admin/waitlist" className="mt-3 inline-block text-[13px] font-bold text-[#E5251B]">
+          <Link
+            href="/admin/waitlist"
+            className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[#FDECEA] px-3 py-1.5 text-[13px] font-bold text-[#B71C14]"
+          >
             {tier.waiting} on the waitlist →
           </Link>
         )}
@@ -303,17 +294,10 @@ export default function AdminEventsPage() {
 
   return (
     <AdminShell active="events" search={q} onSearchChange={setQ}>
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">EVENTS</div>
-          <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-            Your events
-          </h1>
-        </div>
-      </div>
+      <PageHeader eyebrow="EVENTS" title="Your events" />
 
       {!loading && !migrated && (
-        <div className="mt-6 rounded-xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
+        <div className="mt-6 rounded-2xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
           <span className="font-bold">One-time setup needed.</span> Run{" "}
           <span className="font-bold">supabase/seat-limits-waitlist.sql</span> in the Supabase SQL
           editor to turn on seat limits and the waitlist.
@@ -327,82 +311,94 @@ export default function AdminEventsPage() {
       )}
 
       {!loading && loadError && (
-        <div className="mt-10 text-center">
-          <div className="text-lg font-bold text-[#B71C14]">{loadError}</div>
-          <button
-            onClick={() => {
-              setLoading(true);
-              load();
-            }}
-            className="mt-3 text-sm font-bold text-[#E5251B]"
-          >
-            Retry
-          </button>
-        </div>
+        <Empty
+          bare
+          error
+          title={loadError}
+          action={
+            <button
+              onClick={() => {
+                setLoading(true);
+                load();
+              }}
+              className="mt-3 text-sm font-bold text-[#E5251B]"
+            >
+              Retry
+            </button>
+          }
+        />
       )}
 
-      <div className="mt-7 grid grid-cols-1 gap-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:mt-8 sm:gap-5">
         {!loading &&
           !loadError &&
           visible.map((e) => {
             const startsAt = e.startsAt ? new Date(e.startsAt) : null;
             const ended = startsAt ? startsAt.getTime() < now : false;
             return (
-              <div
-                key={e.id}
-                className="flex max-w-[860px] animate-[hwUp_0.5s_ease_both] flex-col gap-5 rounded-xl border border-[#EDE6E3] bg-white p-5.5"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-[13px] text-[#6B6B6B]">
-                      {startsAt
-                        ? startsAt.toLocaleDateString("en-IN", {
-                            weekday: "short",
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })
-                        : "Date TBA"}
-                      {e.venue ? ` · ${e.venue}` : ""}
-                    </div>
-                    <div className="mt-1.5 text-xl font-black tracking-[-0.025em]">{e.name}</div>
-                  </div>
+              <Panel key={e.id} className="max-w-[900px] animate-[hwUp_0.5s_ease_both]">
+                <div className="relative overflow-hidden bg-[#141414] px-4 pb-5 pt-5 text-white sm:px-6 sm:pt-6">
                   <span
-                    className="inline-flex flex-none items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold"
-                    style={
-                      ended
-                        ? { background: "#F3EEEB", color: "#6B6B6B" }
-                        : { background: "#EEF4EF", color: "#2F6B45" }
-                    }
-                  >
-                    <span
-                      className="h-1.5 w-1.5 rounded-full"
-                      style={{ background: ended ? "#6B6B6B" : "#3F8A5A" }}
-                    />
-                    {ended ? "Ended" : "Upcoming"}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 border-y border-[#EDE6E3] py-4 sm:grid-cols-5">
-                  {[
-                    { l: "ACCEPTED", v: String(e.accepted) },
-                    { l: "PENDING", v: String(e.pending) },
-                    { l: "DECLINED / FAILED", v: String(e.declined) },
-                    { l: "WAITLIST", v: String(e.waiting) },
-                    { l: "REVENUE", v: masks.includes("revenue") ? "₹ ••••" : fmt(e.revenue) },
-                  ].map((k) => (
-                    <div key={k.l}>
-                      <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-                        {k.l}
+                    aria-hidden
+                    className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full bg-[#E5251B] opacity-45 blur-3xl"
+                  />
+                  <span
+                    aria-hidden
+                    className="pointer-events-none absolute -bottom-24 left-10 h-40 w-40 rounded-full bg-[#FF7A45] opacity-15 blur-3xl"
+                  />
+                  <div className="relative flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-[12.5px] text-white/60">
+                        {startsAt
+                          ? startsAt.toLocaleDateString("en-IN", {
+                              weekday: "short",
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "Date TBA"}
+                        {e.venue ? ` · ${e.venue}` : ""}
                       </div>
-                      <div className="mt-1 text-xl font-black tracking-[-0.03em] tabular-nums">
-                        {k.v}
+                      <div className="mt-1.5 text-[26px] font-black leading-[1.05] tracking-[-0.04em] sm:text-[32px]">
+                        {e.name}
                       </div>
                     </div>
-                  ))}
+                    <Pill
+                      tone={
+                        ended
+                          ? ["rgba(255,255,255,.1)", "rgba(255,255,255,.7)", "rgba(255,255,255,.5)"]
+                          : ["rgba(111,191,138,.16)", "#9BE0B1", "#6FBF8A"]
+                      }
+                    >
+                      {ended ? "Ended" : "Upcoming"}
+                    </Pill>
+                  </div>
+
+                  <div className="relative mt-5 grid grid-cols-3 gap-x-3 gap-y-4 border-t border-white/10 pt-4 sm:grid-cols-5">
+                    {[
+                      { l: "ACCEPTED", v: String(e.accepted) },
+                      { l: "PENDING", v: String(e.pending) },
+                      { l: "DECLINED / FAILED", v: String(e.declined) },
+                      { l: "WAITLIST", v: String(e.waiting) },
+                      { l: "REVENUE", v: masks.includes("revenue") ? "₹ ••••" : fmt(e.revenue) },
+                    ].map((k) => (
+                      <div key={k.l} className="flex min-w-0 flex-col justify-between">
+                        <div className="text-[10px] font-bold leading-tight tracking-[0.12em] text-white/45">
+                          {k.l}
+                        </div>
+                        <div
+                          className={`mt-1.5 truncate text-[22px] font-black leading-none tracking-[-0.035em] tabular-nums ${
+                            k.l === "REVENUE" ? "text-[#FF6B5E]" : ""
+                          }`}
+                        >
+                          {k.v}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 p-3 sm:p-5">
                   {e.tiers.map((t) => (
                     <TierCard
                       key={`${t.id}-${t.limit}`}
@@ -426,28 +422,23 @@ export default function AdminEventsPage() {
                   ))}
                 </div>
 
-                <p className="m-0 text-[13px] leading-relaxed text-[#6B6B6B]">
+                <p className="m-0 px-4 pb-5 text-[12.5px] leading-relaxed text-[#6B6B6B] sm:px-6">
                   Seats are counted from accepted and pending registrations. When you decline a
                   payment or mark it unsuccessful, that seat is freed and registration reopens
                   automatically. When a tier is full, customers can join the waitlist instead.
                 </p>
-              </div>
+              </Panel>
             );
           })}
       </div>
 
       {!loading && !loadError && visible.length === 0 && (
-        <div className="mt-7 rounded-xl border border-[#EDE6E3] px-6 py-14 text-center">
-          <div className="text-lg font-bold">No events found</div>
-        </div>
+        <Panel className="mt-6">
+          <Empty bare title="No events found" />
+        </Panel>
       )}
 
-      {toastMsg && (
-        <div className="fixed bottom-7 left-1/2 z-[80] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
-          {toastMsg}
-        </div>
-      )}
+      <Toast msg={toastMsg} />
     </AdminShell>
   );
 }

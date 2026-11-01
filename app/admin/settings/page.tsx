@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { useMe } from "../_lib/access";
 import HeatwaveLoader from "@/components/HeatwaveLoader";
+import { DangerBar, Empty, INPUT, PageHeader, Panel, Pill, RED_BUTTON, Sheet, SheetActions, Toast } from "../_components/ui";
 import {
   PAGES,
   ROLE_LABEL,
@@ -55,16 +56,7 @@ function randomPassword() {
 }
 
 function RoleBadge({ role }: { role: Role }) {
-  const c = ROLE_INFO[role].color;
-  return (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-      style={{ background: c[0], color: c[1] }}
-    >
-      <span className="h-1.5 w-1.5 rounded-full" style={{ background: c[2] }} />
-      {ROLE_LABEL[role]}
-    </span>
-  );
+  return <Pill tone={ROLE_INFO[role].color}>{ROLE_LABEL[role]}</Pill>;
 }
 
 function pageSummary(m: Member) {
@@ -250,29 +242,26 @@ export default function AdminSettingsPage() {
     <AdminShell active="settings" search={q} onSearchChange={setQ}>
       {!draft && (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">SETTINGS</div>
-              <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-                Team &amp; access
-              </h1>
-              <p className="mt-2 max-w-[620px] text-sm leading-relaxed text-[#6B6B6B]">
-                Add people to the admin portal as an Admin, Manager or Staff. For managers and
-                staff you choose which sidebar pages they see and which details stay hidden.
-              </p>
-            </div>
-            {!forbidden && (
-              <button
-                onClick={startCreate}
-                className="inline-flex h-11 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6 text-sm font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
-              >
-                + Add team member
-              </button>
-            )}
-          </div>
+          <PageHeader
+            eyebrow="SETTINGS"
+            title="Team & access"
+            action={
+              !forbidden && (
+                <button
+                  onClick={startCreate}
+                  className={`inline-flex h-12 w-full items-center justify-center rounded-full px-6 text-sm font-bold sm:h-11 sm:w-auto ${RED_BUTTON}`}
+                >
+                  + Add team member
+                </button>
+              )
+            }
+          >
+            Add people to the admin portal as an Admin, Manager or Staff. For managers and staff you
+            choose which sidebar pages they see and which details stay hidden.
+          </PageHeader>
 
           {!loading && !migrated && (
-            <div className="mt-6 rounded-xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
+            <div className="mt-6 rounded-2xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
               <span className="font-bold">One-time setup needed.</span> Run{" "}
               <span className="font-bold">supabase/roles-permissions.sql</span> in the Supabase SQL
               editor (step 1, then step 2) to turn on the Manager and Staff roles.
@@ -285,23 +274,26 @@ export default function AdminSettingsPage() {
             </div>
           )}
 
-          {!loading && loadError && (
-            <div className="mt-10 text-center text-lg font-bold text-[#B71C14]">{loadError}</div>
-          )}
+          {!loading && loadError && <Empty bare error title={loadError} />}
 
           {!loading && !loadError && (
-            <div className="mt-7 flex max-w-[860px] flex-col gap-3">
-              {list.map((m) => (
+            <div className="mt-6 flex max-w-[900px] flex-col gap-2.5 sm:mt-8 sm:gap-3">
+              {list.map((m, i) => (
                 <div
                   key={m.id}
-                  className="flex animate-[hwUp_0.4s_ease_both] flex-wrap items-center gap-4 rounded-xl border border-[#EDE6E3] bg-white px-5 py-4"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                  className="flex animate-[hwUp_0.4s_ease_both] flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-[#EDE6E3] bg-white p-4 shadow-[0_1px_2px_rgba(20,20,20,.04)] sm:px-5"
                 >
-                  <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-[#141414] text-sm font-bold text-white">
+                  <span
+                    className={`flex h-11 w-11 flex-none items-center justify-center rounded-full text-sm font-bold text-white ${
+                      m.role === "admin" ? "bg-[#E5251B]" : "bg-[#141414]"
+                    }`}
+                  >
                     {(m.fullName || m.email).slice(0, 2).toUpperCase()}
                   </span>
-                  <div className="min-w-0 flex-1 basis-[220px]">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      <span className="truncate text-[16px] font-bold">{m.fullName || m.email}</span>
+                  <div className="min-w-0 flex-1 basis-[200px]">
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                      <span className="min-w-0 truncate text-[15px] font-bold sm:text-[16px]">{m.fullName || m.email}</span>
                       <RoleBadge role={m.role} />
                       {m.id === me?.id && (
                         <span className="rounded-full border border-[#EDE6E3] px-2 py-0.5 text-[11px] font-bold text-[#6B6B6B]">
@@ -309,7 +301,7 @@ export default function AdminSettingsPage() {
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 truncate text-[13px] text-[#6B6B6B]">
+                    <div className="mt-1 text-[12.5px] leading-snug text-[#6B6B6B] sm:truncate sm:text-[13px]">
                       {m.fullName ? `${m.email} · ` : ""}
                       {pageSummary(m)}
                       {m.lastSignIn
@@ -318,17 +310,17 @@ export default function AdminSettingsPage() {
                     </div>
                   </div>
                   {!forbidden && (
-                    <div className="flex flex-none gap-2">
+                    <div className="flex w-full gap-2 sm:w-auto sm:flex-none [&>button]:h-10 [&>button]:flex-1 sm:[&>button]:h-9 sm:[&>button]:flex-none">
                       <button
                         onClick={() => startEdit(m)}
-                        className="h-9 rounded-full border border-[#EDE6E3] px-5 text-[13px] font-bold hover:border-[#141414]"
+                        className="rounded-full border border-[#EDE6E3] px-5 text-[13px] font-bold transition-colors hover:border-[#141414]"
                       >
                         Edit access
                       </button>
                       {m.id !== me?.id && (
                         <button
                           onClick={() => setToRemove(m)}
-                          className="h-9 rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#B71C14] hover:text-white"
+                          className="rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] transition-colors hover:bg-[#B71C14] hover:text-white"
                         >
                           Remove
                         </button>
@@ -338,9 +330,9 @@ export default function AdminSettingsPage() {
                 </div>
               ))}
               {list.length === 0 && (
-                <div className="rounded-xl border border-[#EDE6E3] px-6 py-14 text-center text-sm text-[#6B6B6B]">
-                  No team members match.
-                </div>
+                <Panel>
+                  <Empty bare title="No team members match" />
+                </Panel>
               )}
             </div>
           )}
@@ -348,34 +340,43 @@ export default function AdminSettingsPage() {
       )}
 
       {draft && (
-        <div className="max-w-[860px]">
+        <div className="max-w-[900px] animate-[hwUp_0.35s_ease_both]">
           <button
             onClick={() => setDraft(null)}
-            className="text-sm font-bold text-[#6B6B6B] hover:text-[#141414]"
+            className="inline-flex h-9 items-center rounded-full bg-white px-3.5 text-sm font-bold text-[#6B6B6B] shadow-[0_1px_2px_rgba(20,20,20,.06)] hover:text-[#141414]"
           >
             ← Team
           </button>
-          <h1 className="m-0 mt-3.5 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
+          <h1 className="m-0 mt-4 text-[30px] font-black leading-[1.02] tracking-[-0.045em] sm:text-[44px]">
             {draft.id ? "Edit access" : "Add team member"}
           </h1>
-          <div className="mt-5 flex gap-7 text-sm font-bold">
-            {["Account & role", "Sidebar & masking"].map((l, i) => (
-              <span key={l} className="flex gap-2" style={{ color: step >= i + 1 ? "#141414" : "#6B6B6B" }}>
-                <span style={{ color: step >= i + 1 ? "#E5251B" : "#6B6B6B" }}>0{i + 1}</span>
-                {l}
-              </span>
-            ))}
+          <div className="mt-5 grid max-w-[460px] grid-cols-2 gap-3">
+            {["Account & role", "Sidebar & masking"].map((l, i) => {
+              const on = step >= i + 1;
+              return (
+                <div key={l}>
+                  <div
+                    className="h-1 rounded-full transition-colors"
+                    style={{ background: on ? "#E5251B" : "#EDE6E3" }}
+                  />
+                  <div className="mt-2 flex gap-1.5 text-[13px] font-bold" style={{ color: on ? "#141414" : "#6B6B6B" }}>
+                    <span style={{ color: on ? "#E5251B" : "#6B6B6B" }}>0{i + 1}</span>
+                    {l}
+                  </div>
+                </div>
+              );
+            })}
           </div>
 
           {step === 1 && (
-            <section className="mt-7 rounded-xl border border-[#EDE6E3] p-6">
+            <Panel className="mt-6 p-4 sm:mt-7 sm:p-6">
               <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                 <label className="block">
                   <span className="text-[13px] font-bold text-[#6B6B6B]">Full name (optional)</span>
                   <input
                     value={draft.fullName}
                     onChange={(e) => setDraft({ ...draft, fullName: e.target.value })}
-                    className="mt-1.5 h-12 w-full rounded-xl border border-[#EDE6E3] px-4 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
+                    className={`mt-1.5 ${INPUT}`}
                   />
                 </label>
                 <label className="block">
@@ -386,7 +387,7 @@ export default function AdminSettingsPage() {
                     disabled={!!draft.id}
                     type="email"
                     autoComplete="off"
-                    className="mt-1.5 h-12 w-full rounded-xl border border-[#EDE6E3] px-4 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)] disabled:bg-[#FAF7F5] disabled:text-[#6B6B6B]"
+                    className={`mt-1.5 ${INPUT} disabled:bg-[#FAF7F5] disabled:text-[#6B6B6B]`}
                   />
                 </label>
               </div>
@@ -394,19 +395,19 @@ export default function AdminSettingsPage() {
                 <span className="text-[13px] font-bold text-[#6B6B6B]">
                   {draft.id ? "New password (leave empty to keep the current one)" : "Password"}
                 </span>
-                <div className="mt-1.5 flex gap-2">
+                <div className="mt-1.5 flex flex-wrap gap-2 sm:flex-nowrap">
                   <input
                     value={draft.password}
                     onChange={(e) => setDraft({ ...draft, password: e.target.value })}
                     type={showPw ? "text" : "password"}
                     autoComplete="new-password"
                     placeholder="At least 8 characters"
-                    className="h-12 min-w-0 flex-1 rounded-xl border border-[#EDE6E3] px-4 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
+                    className={`${INPUT} basis-full sm:basis-auto sm:flex-1`}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPw((v) => !v)}
-                    className="h-12 rounded-xl border border-[#EDE6E3] px-4 text-sm font-bold text-[#6B6B6B]"
+                    className="h-12 flex-1 rounded-xl border border-[#EDE6E3] bg-white px-4 text-sm font-bold text-[#6B6B6B] sm:flex-none"
                   >
                     {showPw ? "Hide" : "Show"}
                   </button>
@@ -416,7 +417,7 @@ export default function AdminSettingsPage() {
                       setDraft({ ...draft, password: randomPassword() });
                       setShowPw(true);
                     }}
-                    className="h-12 rounded-xl border border-[#EDE6E3] px-4 text-sm font-bold text-[#E5251B]"
+                    className="h-12 flex-1 rounded-xl border border-[#EDE6E3] bg-white px-4 text-sm font-bold text-[#E5251B] sm:flex-none"
                   >
                     Generate
                   </button>
@@ -433,13 +434,22 @@ export default function AdminSettingsPage() {
                       type="button"
                       onClick={() => setRole(r)}
                       disabled={draft.id === me?.id && r !== "admin"}
+                      aria-pressed={on}
                       style={{
                         borderColor: on ? "#E5251B" : "#EDE6E3",
-                        boxShadow: on ? "0 0 0 1px #E5251B" : "none",
+                        boxShadow: on ? "0 0 0 1px #E5251B, 0 10px 24px -14px #E5251B" : "none",
                       }}
-                      className="rounded-xl border p-4 text-left disabled:opacity-40"
+                      className="relative rounded-2xl border bg-white p-4 text-left transition-shadow disabled:opacity-40"
                     >
-                      <div className="text-[15px] font-bold">{ROLE_LABEL[r]}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[15px] font-bold">{ROLE_LABEL[r]}</span>
+                        <span
+                          className="flex h-5 w-5 flex-none items-center justify-center rounded-full border-2"
+                          style={{ borderColor: on ? "#E5251B" : "#EDE6E3" }}
+                        >
+                          {on && <span className="h-2 w-2 rounded-full bg-[#E5251B]" />}
+                        </span>
+                      </div>
                       <div className="mt-1 text-[13px] leading-snug text-[#6B6B6B]">{ROLE_INFO[r].desc}</div>
                     </button>
                   );
@@ -448,7 +458,7 @@ export default function AdminSettingsPage() {
 
               {formError && <div className="mt-4 text-sm text-[#C8372D]">{formError}</div>}
               {existsPrompt && (
-                <div className="mt-4 rounded-xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
+                <div className="mt-4 rounded-2xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
                   <span className="font-bold">{draft.email} already has an account</span> (for example a
                   customer who registered for the event). You can give that same account portal access
                   as {ROLE_LABEL[draft.role]}. Their password will be changed to the one you entered,
@@ -470,10 +480,10 @@ export default function AdminSettingsPage() {
                   </div>
                 </div>
               )}
-              <div className="mt-6 flex justify-end gap-2.5">
+              <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end [&>button]:h-12 sm:[&>button]:h-11">
                 <button
                   onClick={() => setDraft(null)}
-                  className="h-11 rounded-full border border-[#EDE6E3] px-6 text-sm font-bold"
+                  className="rounded-full border border-[#EDE6E3] px-6 text-sm font-bold"
                 >
                   Cancel
                 </button>
@@ -481,7 +491,7 @@ export default function AdminSettingsPage() {
                   <button
                     onClick={() => save()}
                     disabled={saving}
-                    className="h-11 rounded-full border border-[#141414] px-6 text-sm font-bold disabled:opacity-50"
+                    className="rounded-full border border-[#141414] px-6 text-sm font-bold disabled:opacity-50"
                   >
                     {saving ? "Saving…" : "Save without changing access"}
                   </button>
@@ -489,7 +499,7 @@ export default function AdminSettingsPage() {
                 <button
                   onClick={goStep2}
                   disabled={saving}
-                  className="h-11 rounded-full bg-[#141414] px-6 text-sm font-bold text-white disabled:opacity-50"
+                  className="rounded-full bg-[#141414] px-6 text-sm font-bold text-white transition active:scale-[.98] disabled:opacity-50"
                 >
                   {draft.role === "admin"
                     ? saving
@@ -500,23 +510,23 @@ export default function AdminSettingsPage() {
                     : "Next: choose access →"}
                 </button>
               </div>
-            </section>
+            </Panel>
           )}
 
           {step === 2 && draft.role !== "admin" && (
-            <section className="mt-7">
+            <section className="mt-6 sm:mt-7">
               <p className="m-0 text-sm leading-relaxed text-[#6B6B6B]">
                 Tick the pages <span className="font-bold text-[#141414]">{draft.email || "this person"}</span>{" "}
                 should see in the sidebar. Inside each page, tick what should be{" "}
                 <span className="font-bold text-[#141414]">hidden</span> from them. Hidden details are
                 removed on the server, not just covered up on screen.
               </p>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="no-scrollbar -mx-4 mt-4 flex gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:px-0 [&>button]:flex-none [&>button]:whitespace-nowrap">
                 {(["manager", "staff"] as Role[]).map((r) => (
                   <button
                     key={r}
                     onClick={() => setDraft({ ...draft, permissions: defaultPermissions(r) })}
-                    className="rounded-full border border-[#EDE6E3] px-3.5 py-1.5 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414]"
+                    className="rounded-full border border-[#EDE6E3] bg-white px-3.5 py-2 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414] sm:py-1.5"
                   >
                     {ROLE_LABEL[r]} preset
                   </button>
@@ -528,19 +538,19 @@ export default function AdminSettingsPage() {
                       permissions: Object.fromEntries(CONFIGURABLE.map((p) => [p.key, []])) as Permissions,
                     })
                   }
-                  className="rounded-full border border-[#EDE6E3] px-3.5 py-1.5 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414]"
+                  className="rounded-full border border-[#EDE6E3] bg-white px-3.5 py-2 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414] sm:py-1.5"
                 >
                   All pages, nothing hidden
                 </button>
                 <button
                   onClick={() => setDraft({ ...draft, permissions: {} })}
-                  className="rounded-full border border-[#EDE6E3] px-3.5 py-1.5 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414]"
+                  className="rounded-full border border-[#EDE6E3] bg-white px-3.5 py-2 text-[13px] font-bold text-[#6B6B6B] hover:border-[#141414] hover:text-[#141414] sm:py-1.5"
                 >
                   Clear
                 </button>
               </div>
 
-              <div className="mt-5 flex flex-col gap-3">
+              <div className="mt-5 flex flex-col gap-2.5 sm:gap-3">
                 {CONFIGURABLE.map((p) => {
                   const perms = draft.permissions as Record<string, string[]>;
                   const visible = Array.isArray(perms[p.key]);
@@ -548,10 +558,13 @@ export default function AdminSettingsPage() {
                   return (
                     <div
                       key={p.key}
-                      className="rounded-xl border bg-white p-5"
-                      style={{ borderColor: visible ? "#141414" : "#EDE6E3" }}
+                      className="rounded-2xl border bg-white p-4 transition-shadow sm:p-5"
+                      style={{
+                        borderColor: visible ? "#141414" : "#EDE6E3",
+                        boxShadow: visible ? "0 10px 24px -16px rgba(20,20,20,.35)" : "none",
+                      }}
                     >
-                      <label className="flex cursor-pointer items-center gap-3">
+                      <label className="flex cursor-pointer flex-wrap items-center gap-x-3 gap-y-1">
                         <input
                           type="checkbox"
                           checked={visible}
@@ -572,7 +585,7 @@ export default function AdminSettingsPage() {
                           <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
                             HIDE FROM THIS PERSON
                           </div>
-                          <div className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-2.5 sm:grid-cols-2">
+                          <div className="mt-2.5 grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
                             {p.masks.map((mk) => (
                               <label key={mk.key} className="flex cursor-pointer items-start gap-2.5">
                                 <input
@@ -583,9 +596,7 @@ export default function AdminSettingsPage() {
                                 />
                                 <span>
                                   <span className="block text-sm font-bold">{mk.label}</span>
-                                  <span className="block text-[12px] leading-snug text-[#6B6B6B]">
-                                    {mk.hint}
-                                  </span>
+                                  <span className="block text-[12px] leading-snug text-[#6B6B6B]">{mk.hint}</span>
                                 </span>
                               </label>
                             ))}
@@ -598,7 +609,7 @@ export default function AdminSettingsPage() {
               </div>
 
               {Object.keys(draft.permissions).length === 0 && (
-                <div className="mt-4 rounded-xl bg-[#FFF6E5] px-5 py-3.5 text-sm text-[#8A5A00]">
+                <div className="mt-4 rounded-2xl bg-[#FFF6E5] px-5 py-3.5 text-sm text-[#8A5A00]">
                   No pages ticked: this person won&apos;t be able to open anything after signing in.
                 </div>
               )}
@@ -606,14 +617,14 @@ export default function AdminSettingsPage() {
               <div className="mt-6 flex justify-between gap-2.5">
                 <button
                   onClick={() => setStep(1)}
-                  className="h-11 rounded-full border border-[#EDE6E3] px-6 text-sm font-bold"
+                  className="h-12 rounded-full border border-[#EDE6E3] bg-white px-6 text-sm font-bold sm:h-11"
                 >
                   ← Back
                 </button>
                 <button
                   onClick={() => save()}
                   disabled={saving}
-                  className="h-11 min-w-[170px] rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6 text-sm font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left disabled:opacity-60"
+                  className={`h-12 min-w-[170px] flex-1 rounded-full px-6 text-sm font-bold disabled:opacity-60 sm:h-11 sm:flex-none ${RED_BUTTON}`}
                 >
                   {saving ? "Saving…" : draft.id ? "Save access" : `Create ${ROLE_LABEL[draft.role].toLowerCase()}`}
                 </button>
@@ -624,50 +635,34 @@ export default function AdminSettingsPage() {
       )}
 
       {toRemove && (
-        <div
-          onClick={() => !removing && setToRemove(null)}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#141414]/60 p-4"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            role="alertdialog"
-            className="w-full max-w-[440px] animate-[hwUp_0.25s_ease_both] overflow-hidden rounded-xl bg-white"
-          >
-            <div className="bg-[#B71C14] px-6 py-4 text-[17px] font-black text-white">
-              Remove portal access?
-            </div>
-            <div className="px-6 py-5">
-              <p className="m-0 text-[15px] leading-relaxed">
-                <span className="font-bold">{toRemove.email}</span> will no longer be able to open the
-                admin portal. Their login stays as an ordinary customer account.
-              </p>
-              <div className="mt-6 flex justify-end gap-2.5">
-                <button
-                  onClick={() => setToRemove(null)}
-                  disabled={removing}
-                  className="h-11 rounded-full border border-[#EDE6E3] px-5 text-sm font-bold"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmRemove}
-                  disabled={removing}
-                  className="h-11 rounded-full bg-[#B71C14] px-5 text-sm font-bold text-white disabled:opacity-50"
-                >
-                  {removing ? "Removing…" : "Remove access"}
-                </button>
-              </div>
-            </div>
+        <Sheet onClose={() => !removing && setToRemove(null)} alert labelledBy="remove-title" width={440}>
+          <DangerBar id="remove-title">Remove portal access?</DangerBar>
+          <div className="px-6 py-5">
+            <p className="m-0 text-[15px] leading-relaxed">
+              <span className="font-bold">{toRemove.email}</span> will no longer be able to open the
+              admin portal. Their login stays as an ordinary customer account.
+            </p>
+            <SheetActions>
+              <button
+                onClick={() => setToRemove(null)}
+                disabled={removing}
+                className="rounded-full border border-[#EDE6E3] px-5 text-sm font-bold"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemove}
+                disabled={removing}
+                className="rounded-full bg-[#B71C14] px-5 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {removing ? "Removing…" : "Remove access"}
+              </button>
+            </SheetActions>
           </div>
-        </div>
+        </Sheet>
       )}
 
-      {toastMsg && (
-        <div className="fixed bottom-7 left-1/2 z-[80] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
-          {toastMsg}
-        </div>
-      )}
+      <Toast msg={toastMsg} />
     </AdminShell>
   );
 }

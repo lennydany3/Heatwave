@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import HeatwaveLoader from "@/components/HeatwaveLoader";
 import { fmt } from "../_lib/data";
+import { Chips, Empty, PageHeader, Panel, PanelHead, Pill, Sheet, StatCard, StatGrid, Toast } from "../_components/ui";
 import type { VerifyState } from "@/lib/verification";
 
 type Filter = VerifyState | "all";
@@ -183,60 +184,40 @@ export default function AdminVerificationPage() {
 
   return (
     <AdminShell active="verification" search={q} onSearchChange={setQ}>
-      <div>
-        <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-          PAYMENT VERIFICATION
-        </div>
-        <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-          Verify UPI payments
-        </h1>
-        <p className="mt-2 max-w-[620px] text-sm leading-relaxed text-[#6B6B6B]">
-          Match each transaction ID and screenshot against your UPI account, then mark it Accepted,
-          Declined or Unsuccessful. Only accepted tickets pass the scanner — every other ticket shows
-          your reason at check-in.
-        </p>
-      </div>
+      <PageHeader eyebrow="PAYMENT VERIFICATION" title="Verify UPI payments">
+        Match each transaction ID and screenshot against your UPI account, then mark it Accepted,
+        Declined or Unsuccessful. Only accepted tickets pass the scanner — every other ticket shows
+        your reason at check-in.
+      </PageHeader>
 
-      <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
+      <StatGrid>
         {[
-          { l: "TO VERIFY", v: String(counts.pending), n: `${money(pendingAmount)} waiting` },
-          { l: "ACCEPTED", v: money(acceptedAmount), n: `${counts.accepted} tickets` },
-          { l: "DECLINED", v: String(counts.declined), n: "not a legit customer" },
-          { l: "UNSUCCESSFUL", v: String(counts.unsuccessful), n: "payment didn't go through" },
-        ].map((k) => (
-          <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">
-            <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">{k.l}</div>
-            <div className="mt-2.5 text-[30px] font-black tracking-[-0.035em] tabular-nums">
-              {k.v}
-            </div>
-            <div className="mt-1.5 text-[13px] text-[#6B6B6B]">{k.n}</div>
-          </div>
+          { l: "TO VERIFY", v: String(counts.pending), n: `${money(pendingAmount)} waiting`, dot: "#D99A1E" },
+          { l: "ACCEPTED", v: money(acceptedAmount), n: `${counts.accepted} tickets`, dot: "#3F8A5A" },
+          { l: "DECLINED", v: String(counts.declined), n: "not a legit customer", dot: "#E5251B" },
+          { l: "UNSUCCESSFUL", v: String(counts.unsuccessful), n: "payment didn't go through", dot: "#8C8480" },
+        ].map((k, i) => (
+          <StatCard
+            key={k.l}
+            index={i}
+            dark={i === 0}
+            label={k.l}
+            value={k.v}
+            note={k.n}
+            dot={i === 0 ? undefined : k.dot}
+            loading={loading}
+          />
         ))}
-      </div>
+      </StatGrid>
 
-      <section className="mt-5 rounded-xl border border-[#EDE6E3]">
-        <div className="flex flex-wrap items-center justify-between gap-3.5 px-6 py-4.5">
-          <div className="text-[17px] font-bold">Submissions</div>
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map(([id, l]) => {
-              const on = filter === id;
-              return (
-                <button
-                  key={id}
-                  onClick={() => setFilter(id)}
-                  style={{
-                    background: on ? "#141414" : "#fff",
-                    color: on ? "#fff" : "#6B6B6B",
-                    borderColor: on ? "#141414" : "#EDE6E3",
-                  }}
-                  className="rounded-full border px-3.5 py-1.5 text-[13px] font-bold"
-                >
-                  {l} <span className="opacity-60">{counts[id]}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <Panel className="mt-3 sm:mt-5">
+        <PanelHead title="Submissions">
+          <Chips
+            options={FILTERS.map(([id, l]) => ({ id, label: l, count: counts[id] }))}
+            value={filter}
+            onChange={setFilter}
+          />
+        </PanelHead>
 
         {loading && (
           <div className="border-t border-[#EDE6E3] px-6 py-16">
@@ -245,87 +226,84 @@ export default function AdminVerificationPage() {
         )}
 
         {!loading && loadError && (
-          <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-            <div className="text-lg font-bold text-[#B71C14]">{loadError}</div>
-            <button onClick={load} className="mt-3 text-sm font-bold text-[#E5251B]">
-              Retry
-            </button>
-          </div>
+          <Empty
+            error
+            title={loadError}
+            action={
+              <button onClick={load} className="mt-3 text-sm font-bold text-[#E5251B]">
+                Retry
+              </button>
+            }
+          />
         )}
 
         {!loading &&
           !loadError &&
           list.map((r) => {
-            const b = STATUS_BADGE[r.decision];
             const isEditing = editing?.id === r.id;
             const busy = saving === r.id;
             const created = new Date(r.createdAt);
             return (
               <div
                 key={r.id}
-                className="flex flex-col gap-4 border-t border-[#EDE6E3] px-5 py-5 sm:px-6 lg:flex-row lg:items-start"
+                className="grid grid-cols-[72px_minmax(0,1fr)] gap-x-3.5 gap-y-3 border-t border-[#EDE6E3] px-4 py-4 sm:grid-cols-[90px_minmax(0,1fr)] sm:px-6 sm:py-5 lg:grid-cols-[90px_minmax(0,1fr)_140px] lg:gap-x-6"
               >
                 <button
                   onClick={() => r.proofUrl && setPreview(r)}
                   disabled={!r.proofUrl}
-                  className="relative h-[120px] w-[90px] flex-none overflow-hidden rounded-lg border border-[#EDE6E3] bg-[#FAF7F5] text-[11px] text-[#6B6B6B]"
+                  aria-label={r.proofUrl ? `View payment screenshot from ${r.fullName}` : undefined}
+                  className="relative h-[96px] w-[72px] overflow-hidden rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] text-[11px] leading-tight text-[#6B6B6B] sm:h-[120px] sm:w-[90px] lg:row-span-2"
                 >
                   {r.proofUrl ? (
-                    <Image
-                      src={r.proofUrl}
-                      alt={`Payment screenshot from ${r.fullName}`}
-                      fill
-                      unoptimized
-                      className="object-cover"
-                    />
+                    <>
+                      <Image
+                        src={r.proofUrl}
+                        alt={`Payment screenshot from ${r.fullName}`}
+                        fill
+                        unoptimized
+                        className="object-cover"
+                      />
+                      <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent pb-1 pt-4 text-center text-[10px] font-bold text-white">
+                        View
+                      </span>
+                    </>
+                  ) : has("proof") ? (
+                    "Hidden"
                   ) : (
-                    has("proof") ? "Hidden" : "No screenshot"
+                    "No screenshot"
                   )}
                 </button>
 
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="text-[17px] font-bold">{r.fullName}</span>
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                      style={{ background: b[0], color: b[1] }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                      {LABEL[r.decision]}
-                    </span>
+                <div className="min-w-0 self-center lg:self-start">
+                  <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+                    <span className="text-[16px] font-bold sm:text-[17px]">{r.fullName}</span>
+                    <Pill tone={STATUS_BADGE[r.decision]}>{LABEL[r.decision]}</Pill>
                   </div>
                   <div className="mt-1 truncate text-[13px] text-[#6B6B6B]">
                     {has("contact") ? "Contact details hidden" : `${r.email} · ${r.mobile}`}
                   </div>
-                  <div className="mt-3.5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-                        UPI TXN ID
-                      </div>
-                      <div className="mt-0.5 font-bold tabular-nums">{r.upiTxnId}</div>
+                </div>
+
+                <div className="col-span-2 min-w-0 lg:col-span-1 lg:col-start-2">
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-xl bg-[#FAF7F5] p-3 sm:grid-cols-4 lg:bg-transparent lg:p-0">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.12em] text-[#6B6B6B] sm:text-[11px]">UPI TXN ID</div>
+                      <div className="mt-0.5 truncate font-bold tabular-nums">{r.upiTxnId}</div>
                     </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-                        AMOUNT
-                      </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.12em] text-[#6B6B6B] sm:text-[11px]">AMOUNT</div>
                       <div className="mt-0.5 font-bold tabular-nums">{money(r.amount)}</div>
                     </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-                        TICKET
-                      </div>
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.12em] text-[#6B6B6B] sm:text-[11px]">TICKET</div>
                       <div className="mt-0.5 truncate font-bold">
                         {r.tierName ?? "—"}
-                        {r.ticketCode && (
-                          <span className="font-normal text-[#6B6B6B]"> · {r.ticketCode}</span>
-                        )}
+                        {r.ticketCode && <span className="font-normal text-[#6B6B6B]"> · {r.ticketCode}</span>}
                       </div>
                     </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-                        SUBMITTED
-                      </div>
-                      <div className="mt-0.5 font-bold">
+                    <div className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.12em] text-[#6B6B6B] sm:text-[11px]">SUBMITTED</div>
+                      <div className="mt-0.5 truncate font-bold">
                         {created.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                         <span className="font-normal text-[#6B6B6B]">
                           {" "}
@@ -339,13 +317,13 @@ export default function AdminVerificationPage() {
                     </div>
                   </div>
                   {r.note && r.decision !== "accepted" && (
-                    <div className="mt-3 rounded-lg bg-[#FAF7F5] px-3.5 py-2.5 text-[13px]">
+                    <div className="mt-3 rounded-xl border border-[#EDE6E3] bg-white px-3.5 py-2.5 text-[13px]">
                       <span className="font-bold">Reason shown at scan:</span> {r.note}
                     </div>
                   )}
 
                   {isEditing && editing && (
-                    <div className="mt-3.5 animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] p-4">
+                    <div className="mt-3.5 animate-[hwUp_0.2s_ease_both] rounded-2xl border border-[#EDE6E3] bg-white p-4 shadow-[0_10px_30px_-18px_rgba(20,20,20,.25)]">
                       <div className="text-sm font-bold">{REASON_PROMPT[editing.decision]}</div>
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
                         {QUICK_REASONS[editing.decision].map((s) => (
@@ -355,11 +333,11 @@ export default function AdminVerificationPage() {
                               setReason(s);
                               setReasonError("");
                             }}
-                            style={{
-                              borderColor: reason === s ? "#E5251B" : "#EDE6E3",
-                              color: reason === s ? "#E5251B" : "#6B6B6B",
-                            }}
-                            className="rounded-full border px-3 py-1 text-xs font-bold"
+                            className={`rounded-full border px-3 py-1.5 text-left text-xs font-bold transition-colors ${
+                              reason === s
+                                ? "border-[#E5251B] bg-[#FDECEA] text-[#B71C14]"
+                                : "border-[#EDE6E3] text-[#6B6B6B]"
+                            }`}
                           >
                             {s}
                           </button>
@@ -373,22 +351,20 @@ export default function AdminVerificationPage() {
                         }}
                         rows={2}
                         placeholder="Reason shown to the gate scanner"
-                        className="mt-3 w-full resize-none rounded-lg border border-[#EDE6E3] px-3 py-2 text-sm outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
+                        className="mt-3 w-full resize-none rounded-xl border border-[#EDE6E3] px-3 py-2 text-base outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)] sm:text-sm"
                       />
-                      {reasonError && (
-                        <div className="mt-1 text-[13px] text-[#C8372D]">{reasonError}</div>
-                      )}
+                      {reasonError && <div className="mt-1 text-[13px] text-[#C8372D]">{reasonError}</div>}
                       <div className="mt-3 flex justify-end gap-2">
                         <button
                           onClick={() => setEditing(null)}
-                          className="h-9 rounded-full px-4 text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
+                          className="h-10 rounded-full px-4 text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={() => saveReason(r)}
                           disabled={busy}
-                          className="h-9 rounded-full bg-[#141414] px-4 text-[13px] font-bold text-white disabled:opacity-50"
+                          className="h-10 rounded-full bg-[#141414] px-5 text-[13px] font-bold text-white disabled:opacity-50"
                         >
                           {busy ? "Saving…" : `Mark ${LABEL[editing.decision].toLowerCase()}`}
                         </button>
@@ -398,29 +374,29 @@ export default function AdminVerificationPage() {
                 </div>
 
                 {has("decide") ? (
-                  <div className="flex-none self-center rounded-full border border-[#EDE6E3] px-4 py-2 text-xs font-bold text-[#6B6B6B] lg:w-[132px] lg:text-center">
+                  <div className="col-span-2 self-start rounded-full border border-[#EDE6E3] px-4 py-2 text-center text-xs font-bold text-[#6B6B6B] lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1">
                     View only
                   </div>
                 ) : (
-                <div className="flex flex-none flex-wrap gap-2 lg:w-[132px] lg:flex-col">
+                  <div className="col-span-2 grid grid-cols-3 gap-2 self-start lg:col-span-1 lg:col-start-3 lg:row-span-2 lg:row-start-1 lg:flex lg:flex-col">
                     <button
                       onClick={() => update(r, "accepted")}
                       disabled={busy || r.decision === "accepted"}
-                      className="h-9 rounded-full bg-[#2F6B45] px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-35"
+                      className="h-11 rounded-full bg-[#2F6B45] px-3 text-[13px] font-bold text-white shadow-[0_6px_16px_-8px_rgba(47,107,69,.8)] transition active:scale-[.97] disabled:opacity-35 disabled:shadow-none lg:h-9"
                     >
                       {r.decision === "accepted" ? "Accepted" : "Accept"}
                     </button>
                     <button
                       onClick={() => startEdit(r, "declined")}
                       disabled={busy}
-                      className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B] disabled:opacity-35"
+                      className="h-11 rounded-full border border-[#EDE6E3] bg-white px-3 text-[13px] font-bold transition hover:border-[#E5251B] hover:text-[#E5251B] active:scale-[.97] disabled:opacity-35 lg:h-9"
                     >
                       Decline
                     </button>
                     <button
                       onClick={() => startEdit(r, "unsuccessful")}
                       disabled={busy}
-                      className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
+                      className="h-11 rounded-full border border-[#EDE6E3] bg-white px-3 text-[13px] font-bold transition hover:border-[#141414] active:scale-[.97] disabled:opacity-35 lg:h-9"
                     >
                       Unsuccessful
                     </button>
@@ -428,7 +404,7 @@ export default function AdminVerificationPage() {
                       <button
                         onClick={() => startEdit(r, "pending")}
                         disabled={busy}
-                        className="h-8 text-xs font-bold text-[#6B6B6B] hover:text-[#8A5A00] disabled:opacity-35"
+                        className="col-span-3 h-9 text-xs font-bold text-[#6B6B6B] hover:text-[#8A5A00] disabled:opacity-35 lg:h-8"
                       >
                         Reset to pending
                       </button>
@@ -440,70 +416,52 @@ export default function AdminVerificationPage() {
           })}
 
         {!loading && !loadError && list.length === 0 && (
-          <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-            <div className="text-lg font-bold">
-              {filter === "pending" ? "All caught up" : "Nothing here"}
-            </div>
-            <div className="mt-1.5 text-sm text-[#6B6B6B]">
-              {filter === "pending"
-                ? "No payments are waiting for verification."
-                : "No submissions match this filter."}
-            </div>
-          </div>
+          <Empty title={filter === "pending" ? "All caught up" : "Nothing here"}>
+            {filter === "pending"
+              ? "No payments are waiting for verification."
+              : "No submissions match this filter."}
+          </Empty>
         )}
-      </section>
+      </Panel>
 
       {preview?.proofUrl && (
-        <div
-          onClick={() => setPreview(null)}
-          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#141414]/70 p-4"
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="flex max-h-full w-full max-w-[460px] animate-[hwUp_0.25s_ease_both] flex-col overflow-hidden rounded-xl bg-white"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-[#EDE6E3] px-5 py-3.5">
-              <div className="min-w-0">
-                <div className="truncate text-[15px] font-bold">{preview.fullName}</div>
-                <div className="text-xs tabular-nums text-[#6B6B6B]">
-                  UTR {preview.upiTxnId} · {money(preview.amount)}
-                </div>
+        <Sheet onClose={() => setPreview(null)} width={460}>
+          <div className="flex items-center justify-between gap-3 border-b border-[#EDE6E3] px-5 pb-3.5 pt-6 sm:pt-3.5">
+            <div className="min-w-0">
+              <div className="truncate text-[15px] font-bold">{preview.fullName}</div>
+              <div className="text-xs tabular-nums text-[#6B6B6B]">
+                UTR {preview.upiTxnId} · {money(preview.amount)}
               </div>
-              <button
-                onClick={() => setPreview(null)}
-                aria-label="Close"
-                className="flex h-9 w-9 flex-none items-center justify-center rounded-full text-xl text-[#6B6B6B] hover:bg-[#FAF7F5] hover:text-[#141414]"
-              >
-                ×
-              </button>
             </div>
-            <div className="relative min-h-[60vh] flex-1 bg-[#FAF7F5]">
-              <Image
-                src={preview.proofUrl}
-                alt={`Payment screenshot from ${preview.fullName}`}
-                fill
-                unoptimized
-                className="object-contain"
-              />
-            </div>
-            <a
-              href={preview.proofUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="border-t border-[#EDE6E3] px-5 py-3 text-center text-sm font-bold text-[#E5251B]"
+            <button
+              onClick={() => setPreview(null)}
+              aria-label="Close"
+              className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#FAF7F5] text-xl text-[#6B6B6B] hover:text-[#141414]"
             >
-              Open full size
-            </a>
+              ×
+            </button>
           </div>
-        </div>
+          <div className="relative h-[62dvh] bg-[#FAF7F5]">
+            <Image
+              src={preview.proofUrl}
+              alt={`Payment screenshot from ${preview.fullName}`}
+              fill
+              unoptimized
+              className="object-contain"
+            />
+          </div>
+          <a
+            href={preview.proofUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="block border-t border-[#EDE6E3] px-5 py-3.5 text-center text-sm font-bold text-[#E5251B]"
+          >
+            Open full size
+          </a>
+        </Sheet>
       )}
 
-      {toastMsg && (
-        <div className="fixed bottom-7 left-1/2 z-[80] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
-          {toastMsg}
-        </div>
-      )}
+      <Toast msg={toastMsg} />
     </AdminShell>
   );
 }
