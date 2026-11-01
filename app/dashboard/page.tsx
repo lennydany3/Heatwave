@@ -2,10 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import BottomNav, { BOTTOM_NAV_SPACE } from "@/components/BottomNav";
+import Navbar, { NAVBAR_OFFSET } from "@/components/Navbar";
 import SupportModal from "@/components/SupportModal";
 import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
@@ -254,25 +255,12 @@ function Wave() {
 }
 
 export default function DashboardPage() {
-  const { user, signOut } = useAuth();
-  const router = useRouter();
+  const { user } = useAuth();
   const fullName =
     (user?.user_metadata?.full_name as string | undefined) ||
     user?.email?.split("@")[0] ||
     "there";
   const firstName = fullName.split(" ")[0];
-  const initials =
-    fullName
-      .split(" ")
-      .filter(Boolean)
-      .slice(0, 2)
-      .map((s) => s[0]?.toUpperCase())
-      .join("") || "U";
-
-  async function handleLogout() {
-    await signOut();
-    router.push("/");
-  }
 
   const [tab, setTab] = useState<TabId>("upcoming");
   const [tickets, setTickets] = useState<Ticket[]>([]);
@@ -281,7 +269,6 @@ export default function DashboardPage() {
   // The admin's outcome per ticket code, to tell "try again" from "contact support".
   const [retryable, setRetryable] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -435,62 +422,13 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#FAF7F5] pb-[calc(72px+env(safe-area-inset-bottom))] text-[#141414] lg:pb-0"
+      className={`min-h-screen bg-[#FAF7F5] text-[#141414] ${BOTTOM_NAV_SPACE}`}
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="sticky top-0 z-30 border-b border-[#EDE6E3] bg-white">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-3 sm:px-6 sm:py-4">
-          <Link href="/" className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]">
-            heatwave
-            <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
-          </Link>
-          <nav className="hidden gap-1.5 text-sm font-bold lg:flex">
-            <span className="rounded-full bg-[#FDECEA] px-4 py-2 text-[#E5251B]">My Tickets</span>
-            <Link href="/" className="rounded-full px-4 py-2 text-[#6B6B6B] hover:text-[#141414]">
-              Events
-            </Link>
-            <Link href="#" className="rounded-full px-4 py-2 text-[#6B6B6B] hover:text-[#141414]">
-              Profile
-            </Link>
-          </nav>
-          <div className="relative">
-            <button
-              onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Account menu"
-              aria-expanded={menuOpen}
-              className="flex items-center gap-2.5"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#141414] text-sm font-bold text-white">
-                {initials}
-              </span>
-              <span className="hidden text-xs text-[#6B6B6B] lg:inline">▼</span>
-            </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-[-1]" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-12 w-[240px] animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] bg-white p-2 shadow-[0_12px_32px_rgba(20,20,20,.12)]">
-                  <div className="mb-1.5 border-b border-[#EDE6E3] px-3 pb-3 pt-2.5">
-                    <div className="truncate text-[15px] font-bold">{fullName}</div>
-                    <div className="truncate text-[13px] text-[#6B6B6B]">{user?.email}</div>
-                  </div>
-                  <Link href="#" className="block rounded-lg px-3 py-3 text-sm hover:bg-[#FAF7F5]">
-                    Profile settings
-                  </Link>
-                  <button
-                    onClick={handleLogout}
-                    className="block w-full rounded-lg px-3 py-3 text-left text-sm text-[#E5251B] hover:bg-[#FDECEA]"
-                  >
-                    Log out
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Hero: poster backdrop with the next ticket */}
-      <section className="relative isolate overflow-hidden bg-[#120C0B]">
+      <section className={`relative isolate overflow-hidden bg-[#120C0B] ${NAVBAR_OFFSET}`}>
         <div className="pointer-events-none absolute inset-0 -z-10">
           <Image
             src={hlPoster ?? EVENT.poster}
@@ -542,7 +480,7 @@ export default function DashboardPage() {
               {/* Ticket */}
               <div className="mt-3 animate-[hwUp_0.6s_0.1s_ease_both] drop-shadow-[0_24px_36px_rgba(0,0,0,0.5)]">
                 <div className="overflow-hidden rounded-t-[22px] bg-white" style={notch("bottom")}>
-                  <div className="relative h-[160px] overflow-hidden bg-[#1E1716] sm:h-[180px]">
+                  <div className="relative aspect-[19/10] overflow-hidden bg-[#1E1716]">
                     {hlPoster ? (
                       <Image
                         src={hlPoster}
@@ -550,29 +488,30 @@ export default function DashboardPage() {
                         fill
                         priority
                         sizes="440px"
-                        className="object-cover object-[center_40%]"
+                        className="object-cover object-top"
                       />
                     ) : (
                       <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(229,37,27,0.45),transparent_60%)]" />
                     )}
-                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,20,20,0.45)_0%,rgba(20,20,20,0)_30%,rgba(20,20,20,0.1)_55%,rgba(20,20,20,0.9)_100%)]" />
+                    <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(20,20,20,0.45),transparent)]" />
                     <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2">
                       <span className="rounded-full bg-black/35 px-2.5 py-1 font-mono text-[11px] font-bold text-white backdrop-blur-md">
                         {hl.bid}
                       </span>
                       <StatusBadge status={hl.status} />
                     </div>
-                    <div className="absolute inset-x-4 bottom-3.5">
-                      <div className="truncate text-[32px] font-black leading-[0.95] tracking-[-0.05em] text-white">
-                        {hl.title}
-                      </div>
-                      {hlPoster && (
-                        <div className="mt-1 text-[13px] font-bold text-[#FF6A5F]">{EVENT.presenter}</div>
-                      )}
-                    </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 pb-5 pt-4 sm:px-5">
+                  <div className="px-4 pt-4 sm:px-5">
+                    <div className="truncate text-[26px] font-black leading-none tracking-[-0.045em]">
+                      {hl.title}
+                    </div>
+                    {hlPoster && (
+                      <div className="mt-1 text-[13px] font-bold text-[#E5251B]">{EVENT.presenter}</div>
+                    )}
+                  </div>
+
+                  <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[#EDE6E3] px-4 pb-5 pt-3.5 sm:px-5">
                     {[
                       { label: "DATE", value: hl.date },
                       { label: "TIME", value: hl.time },
@@ -937,40 +876,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-[#EDE6E3] bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
-        <Link href="/dashboard" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#E5251B]">
-          <span className="flex h-7 w-12 items-center justify-center rounded-full bg-[#FDECEA]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M4 7a2 2 0 012-2h12a2 2 0 012 2v2a2.5 2.5 0 000 5v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2.5 2.5 0 000-5V7z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <path d="M14 5v13" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2.5" />
-            </svg>
-          </span>
-          Tickets
-        </Link>
-        <Link href="/" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
-          <span className="flex h-7 w-12 items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-              <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-          </span>
-          Events
-        </Link>
-        <Link href="#" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
-          <span className="flex h-7 w-12 items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8.5" r="3.8" stroke="currentColor" strokeWidth="2" />
-              <path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </span>
-          Profile
-        </Link>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

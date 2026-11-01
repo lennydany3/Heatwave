@@ -6,12 +6,13 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import AuthModal from "@/components/auth/AuthModal";
+import Navbar from "@/components/Navbar";
 import SupportModal from "@/components/SupportModal";
 import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
 
 const btn =
-  "inline-flex items-center justify-center gap-2.5 rounded-full text-white font-bold transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
+  "inline-flex items-center justify-center gap-2 rounded-full bg-[#E5251B] font-bold text-white shadow-[0_8px_18px_-8px_rgba(229,37,27,0.65)] transition-[background-color,transform] duration-200 ease-out hover:bg-[#CF2017] active:scale-[0.98]";
 
 function Wave({ className = "" }: { className?: string }) {
   const path =
@@ -52,18 +53,11 @@ const FALLBACK_TIERS: Tier[] = [
 
 const TIER_NOTE: Record<Tier["status"], string> = {
   open: "Limited early-bird price",
-  coming_soon: "Announced soon",
+  coming_soon: "Comeing Soon",
   closed: "Sold out",
 };
 
 const money = (n: number | null) => (n ? "₹" + n.toLocaleString("en-IN") : "× × ×");
-
-const NAV_LINKS = [
-  { href: "#about", label: "About" },
-  { href: "#tickets", label: "Tickets" },
-  { href: "#venue", label: "Venue" },
-  { href: "#faq", label: "FAQ" },
-];
 
 const HIGHLIGHTS = [
   "A 4-hour cruise on the waters of Muthukadu",
@@ -87,7 +81,7 @@ const FAQS = [
   },
   {
     q: "Why are prices different for male and female?",
-    a: "Pricing is set per gender for each ticket phase. The current prices are listed in the Tickets section above, and the next phase will be announced soon.",
+    a: "Pricing is set per gender for each ticket phase. The current prices are listed in the Tickets section above, and the next phase will be Comeing Soon.",
   },
 ];
 
@@ -101,7 +95,6 @@ export default function EventPage({
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
   const [supportOpen, setSupportOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [tiers, setTiers] = useState<Tier[]>(
     initialTiers && initialTiers.length > 0 ? initialTiers : FALLBACK_TIERS
   );
@@ -109,7 +102,7 @@ export default function EventPage({
   const [closedIds, setClosedIds] = useState<Record<string, boolean>>(
     initialClosed ?? {}
   );
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user } = useAuth();
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [redirectAfterAuth, setRedirectAfterAuth] = useState<string | null>(
@@ -122,19 +115,6 @@ export default function EventPage({
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
-
-  useEffect(() => {
-    if (!menuOpen) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
-    const mq = window.matchMedia("(min-width: 768px)");
-    const onMq = () => mq.matches && setMenuOpen(false);
-    window.addEventListener("keydown", onKey);
-    mq.addEventListener("change", onMq);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      mq.removeEventListener("change", onMq);
-    };
-  }, [menuOpen]);
 
   useEffect(() => {
     // The server already supplied the tiers; only fetch in the browser as a fallback.
@@ -190,11 +170,13 @@ export default function EventPage({
     ? [openTier.price_male, openTier.price_female].filter((n): n is number => !!n)
     : [];
   const fromPrice = openPrices.length ? "₹" + Math.min(...openPrices).toLocaleString("en-IN") : "TBA";
+  const ctaLabel =
+    openTier || !tiers.some((t) => t.status !== "coming_soon") ? "Register now" : "Join waitlist";
   const info = [
     { label: "DATE", value: EVENT.dateLabel },
     { label: "TIME", value: EVENT.timeLabel },
     { label: "VENUE", value: EVENT.venueShort },
-    { label: "PRICE", value: openPrices.length ? `From ${fromPrice}` : "Announced soon" },
+    { label: "PRICE", value: openPrices.length ? `From ${fromPrice}` : "Comeing Soon" },
   ];
 
   function handleRegisterClick(e?: MouseEvent) {
@@ -224,145 +206,12 @@ export default function EventPage({
       className="flex min-h-screen flex-col bg-white text-[#141414]"
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="sticky top-0 z-40 border-b border-[#EDE6E3] bg-white">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-3.5 sm:px-6 md:py-[18px]">
-          <Link
-            href="/"
-            onClick={() => setMenuOpen(false)}
-            className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]"
-          >
-            heatwave
-            <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
-          </Link>
-
-          {/* Desktop nav */}
-          <div className="hidden items-center gap-7 md:flex">
-            <nav className="flex items-center gap-7 text-sm font-medium">
-              {NAV_LINKS.map((l) => (
-                <a key={l.href} href={l.href} className="hover:text-[#E5251B]">
-                  {l.label}
-                </a>
-              ))}
-              {user && (
-                <Link href="/dashboard" className="hover:text-[#E5251B]">
-                  My Tickets
-                </Link>
-              )}
-            </nav>
-            {!authLoading &&
-              (user ? (
-                <button
-                  onClick={() => signOut()}
-                  className="text-sm font-bold text-[#6B6B6B] hover:text-[#141414]"
-                >
-                  Log out
-                </button>
-              ) : (
-                <button
-                  onClick={openLogin}
-                  className="text-sm font-bold text-[#141414] hover:text-[#E5251B]"
-                >
-                  Log in
-                </button>
-              ))}
-          </div>
-
-          {/* Mobile controls */}
-          <div className="flex items-center gap-2 md:hidden">
-            {!authLoading && !user && (
-              <button
-                onClick={openLogin}
-                className="h-10 rounded-full border border-[#EDE6E3] px-4 text-sm font-bold text-[#141414] active:bg-[#FAF7F5]"
-              >
-                Log in
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => setMenuOpen((o) => !o)}
-              aria-label={menuOpen ? "Close menu" : "Open menu"}
-              aria-expanded={menuOpen}
-              aria-controls="mobile-menu"
-              className="flex h-10 w-10 items-center justify-center rounded-full active:bg-[#FAF7F5]"
-            >
-              <span className="relative block h-3.5 w-5">
-                <span
-                  className="absolute left-0 top-0 h-0.5 w-5 rounded bg-[#141414] transition-transform duration-200"
-                  style={{ transform: menuOpen ? "translateY(6px) rotate(45deg)" : "none" }}
-                />
-                <span
-                  className="absolute bottom-0 left-0 h-0.5 w-5 rounded bg-[#141414] transition-transform duration-200"
-                  style={{ transform: menuOpen ? "translateY(-6px) rotate(-45deg)" : "none" }}
-                />
-              </span>
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile menu sheet */}
-        {menuOpen && (
-          <>
-            <div
-              onClick={() => setMenuOpen(false)}
-              className="fixed inset-x-0 bottom-0 top-[65px] -z-10 bg-[#141414]/40 md:hidden"
-            />
-            <nav
-              id="mobile-menu"
-              className="animate-[hwUp_0.2s_ease_both] border-t border-[#EDE6E3] bg-white px-5 pb-6 pt-2 shadow-[0_18px_30px_-18px_rgba(20,20,20,0.25)] md:hidden"
-            >
-              {NAV_LINKS.map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="flex h-14 items-center justify-between border-b border-[#EDE6E3] text-[17px] font-bold active:text-[#E5251B]"
-                >
-                  {l.label}
-                  <span className="text-[#E5251B]">→</span>
-                </a>
-              ))}
-              {user && (
-                <Link
-                  href="/dashboard"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex h-14 items-center justify-between border-b border-[#EDE6E3] text-[17px] font-bold active:text-[#E5251B]"
-                >
-                  My Tickets
-                  <span className="text-[#E5251B]">→</span>
-                </Link>
-              )}
-              <div className="mt-5">
-                {user ? (
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      signOut();
-                    }}
-                    className="h-12 w-full rounded-full border border-[#EDE6E3] text-[15px] font-bold text-[#6B6B6B]"
-                  >
-                    Log out
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setMenuOpen(false);
-                      handleRegisterClick();
-                    }}
-                    className={`h-12 w-full text-[15px] ${btn}`}
-                  >
-                    Register now <span>→</span>
-                  </button>
-                )}
-              </div>
-            </nav>
-          </>
-        )}
-      </header>
+      <Navbar onLogin={openLogin} onRegister={handleRegisterClick} ctaLabel={ctaLabel} />
 
       <section className="relative overflow-hidden">
         <div className="mx-auto grid max-w-[1200px] items-center gap-8 px-5 pb-12 pt-6 sm:px-6 sm:pt-10 lg:grid-cols-2 lg:gap-14 lg:py-[72px] lg:pb-[88px]">
           <div className="relative min-w-0 lg:order-last">
-            <div className="relative mx-auto aspect-[4/5] w-full max-w-[420px] overflow-hidden rounded-2xl border border-[#EDE6E3] shadow-[0_20px_40px_-24px_rgba(20,20,20,0.35)] sm:max-w-[460px] lg:max-h-[620px] lg:max-w-none">
+            <div className="relative mx-auto aspect-[4/5] w-full max-w-[420px] overflow-hidden rounded-2xl border border-[#EDE6E3] shadow-[0_20px_40px_-24px_rgba(20,20,20,0.35)] sm:max-w-[460px] lg:mr-0 lg:max-w-[496px]">
               <Image
                 src={EVENT.poster}
                 alt={EVENT.posterAlt}
@@ -411,7 +260,7 @@ export default function EventPage({
                 onClick={handleRegisterClick}
                 className={`h-14 px-8 text-base ${btn}`}
               >
-                {openTier || !tiers.some((t) => t.status !== "coming_soon") ? "Register now" : "Join waitlist"}{" "}
+                {ctaLabel}{" "}
                 <span>→</span>
               </button>
               <span className="text-center text-sm text-[#6B6B6B] sm:text-left">
@@ -424,7 +273,7 @@ export default function EventPage({
 
       <section
         id="about"
-        className="border-y border-[#EDE6E3] bg-[#FAF7F5]"
+        className="scroll-mt-20 border-y border-[#EDE6E3] bg-[#FAF7F5]"
       >
         <div className="mx-auto grid max-w-[1200px] gap-8 px-5 py-14 sm:px-6 sm:py-20 md:grid-cols-2 md:gap-14 lg:py-24">
           <div className="min-w-0">
@@ -454,7 +303,7 @@ export default function EventPage({
         </div>
       </section>
 
-      <section id="tickets">
+      <section id="tickets" className="scroll-mt-20">
         <div className="mx-auto max-w-[880px] px-5 py-14 sm:px-6 sm:py-20 lg:py-24">
           <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
             TICKETS
@@ -497,7 +346,7 @@ export default function EventPage({
         </div>
       </section>
 
-      <section id="venue" className="border-y border-[#EDE6E3] bg-[#FAF7F5]">
+      <section id="venue" className="scroll-mt-20 border-y border-[#EDE6E3] bg-[#FAF7F5]">
         <div className="mx-auto max-w-[1200px] px-5 py-14 sm:px-6 sm:py-20 lg:py-24">
           <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
             VENUE
@@ -534,7 +383,7 @@ export default function EventPage({
         </div>
       </section>
 
-      <section id="faq">
+      <section id="faq" className="scroll-mt-20">
         <div className="mx-auto max-w-[880px] px-5 py-14 sm:px-6 sm:py-20 lg:py-24">
           <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
             FAQ

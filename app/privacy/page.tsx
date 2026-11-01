@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="30 October 2026">
+    <LegalPage title="Privacy Policy" updated="1 November 2026">
       <Section heading="1. Who we are">
         <p>
           Heatwave (&quot;Heatwave&quot;, &quot;we&quot;, &quot;us&quot;) operates this website and
@@ -34,10 +34,10 @@ export default function PrivacyPage() {
           price and is not used for any other purpose.
         </p>
         <p>
-          <strong className="text-[#141414]">Payment information.</strong> Payments are processed
-          directly by Razorpay. We do not receive or store your card, UPI, or bank account
-          details — we only receive confirmation that a payment succeeded, a payment reference
-          ID, and the amount charged.
+          <strong className="text-[#141414]">Payment information.</strong> You pay via UPI directly
+          from your own UPI app. To verify your payment, we collect the UPI transaction ID, the
+          amount, and the payment screenshot you upload. We never see or store your UPI PIN,
+          card, or bank account details.
         </p>
         <p>
           <strong className="text-[#141414]">Technical information.</strong> Like most websites,
@@ -64,11 +64,8 @@ export default function PrivacyPage() {
         <ul className="ml-5 list-disc">
           <li>
             <strong className="text-[#141414]">Supabase</strong> — our authentication and
-            database provider, which stores your account and registration data securely.
-          </li>
-          <li>
-            <strong className="text-[#141414]">Razorpay</strong> — our payment gateway, which
-            processes your payment directly and securely.
+            database provider, which stores your account, registration data, and payment
+            screenshots securely.
           </li>
           <li>
             <strong className="text-[#141414]">Google</strong> — only if you choose to sign in
@@ -81,11 +78,10 @@ export default function PrivacyPage() {
       <Section heading="5. Cookies">
         <p>
           We use a small number of cookies that are strictly necessary for the site to work —
-          primarily to keep you signed in. When you check out, Razorpay&apos;s payment widget
-          may also set its own cookies to process your payment securely and prevent fraud; those
-          are controlled by Razorpay, not us. You&apos;ll see a short notice about this the first
-          time you visit — accepting it simply dismisses the notice and doesn&apos;t change what
-          cookies are set, since the cookies we use are required for the site to function.
+          primarily to keep you signed in. We don&apos;t use advertising or tracking cookies.
+          You&apos;ll see a short notice about this the first time you visit — accepting it simply
+          dismisses the notice and doesn&apos;t change what cookies are set, since the cookies we
+          use are required for the site to function.
         </p>
       </Section>
 

@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import Navbar, { NAVBAR_OFFSET } from "@/components/Navbar";
 import SupportModal from "@/components/SupportModal";
 import { compressImage, formatBytes } from "@/lib/compressImage";
 import { EVENT } from "@/lib/event";
@@ -77,12 +78,6 @@ const MAX_RAW_PROOF_BYTES = 15 * 1024 * 1024;
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 const PROOF_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
 const PREVIEWABLE = ["image/png", "image/jpeg", "image/webp"];
-
-const EXISTING_LABEL: Record<ExistingRegistration["status"], string> = {
-  pending: "Payment verification pending",
-  paid: "Payment verified",
-  failed: "Payment verification failed",
-};
 
 // `pa` is left unencoded: several UPI apps reject a percent-encoded "@".
 function upiLink(amount: number, note: string) {
@@ -154,7 +149,17 @@ const actionBar =
   "sticky bottom-0 z-10 -mx-5 mt-8 flex items-center justify-between gap-4 border-t border-[#EDE6E3] bg-white px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0";
 
 const btn =
-  "inline-flex h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left disabled:opacity-60 disabled:pointer-events-none";
+  "inline-flex h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-bold text-white transition-[background-color,transform] duration-200 ease-out bg-[#E5251B] shadow-[0_8px_18px_-8px_rgba(229,37,27,0.65)] hover:bg-[#CF2017] active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none";
+
+// Cuts half-circle notches into the edges of each ticket half, so the poster
+// backdrop shows through them.
+function notch(edge: "top" | "bottom"): React.CSSProperties {
+  const y = edge === "top" ? "0" : "100%";
+  const mask =
+    `radial-gradient(circle at 0 ${y}, transparent 11px, #000 11.5px) left / 51% 100% no-repeat, ` +
+    `radial-gradient(circle at 100% ${y}, transparent 11px, #000 11.5px) right / 51% 100% no-repeat`;
+  return { WebkitMask: mask, mask };
+}
 
 function EventThumb({ className = "" }: { className?: string }) {
   return (
@@ -591,95 +596,221 @@ export default function RegisterForm({
     const failed = existing.status === "failed";
     const verified = existing.status === "paid";
     const retry = failed && !!existing.canRetry;
-    const name = existing.eventName ?? event?.name ?? "this event";
-    const tone = failed ? "#E5251B" : verified ? "#3F8A5A" : "#D99A1E";
+    const name = existing.eventName ?? event?.name ?? EVENT.name;
+    const tone = failed
+      ? { solid: "#E5251B", ring: "rgba(229,37,27,0.2)", bg: "#FDECEA", fg: "#B71C14" }
+      : verified
+        ? { solid: "#3F8A5A", ring: "rgba(63,138,90,0.22)", bg: "#EEF4EF", fg: "#2F6B45" }
+        : { solid: "#D99A1E", ring: "rgba(217,154,30,0.22)", bg: "#FFF6E5", fg: "#8A5A00" };
 
     const heading = verified
       ? "You're registered"
       : failed
         ? retry
-          ? "Your payment wasn't successful"
-          : "We couldn't approve your registration"
+          ? "Payment not found"
+          : "Registration declined"
         : "Registration received";
     const lead = verified
-      ? `Your payment for ${name} is verified and your ticket is confirmed.`
+      ? "Your payment is verified. See you on the water!"
       : failed
         ? retry
-          ? `We couldn't find your payment for ${name} in our account, so your ticket isn't valid yet. You can register again with a fresh payment.`
-          : `We reviewed your registration for ${name} and couldn't approve it, so this ticket isn't valid at the gate.`
-        : `We have your registration for ${name}. We're verifying your UPI payment — your QR works at the gate once it's verified.`;
+          ? "We couldn't find your payment. You can register again with a fresh payment."
+          : "We couldn't approve this registration, so the ticket isn't valid at the gate."
+        : "We're verifying your UPI payment. Your QR works at the gate once it's verified.";
+    const stubNote = verified
+      ? "Show this QR at the gate."
+      : failed
+        ? "This ticket isn't valid for entry."
+        : "Your QR unlocks once the payment is verified.";
+
+    const statusIcon = verified ? (
+      <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+    ) : failed ? (
+      <path d="M7 7l10 10M17 7L7 17" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" />
+    ) : (
+      <>
+        <circle cx="12" cy="12" r="8.5" stroke="#fff" strokeWidth="2" fill="none" />
+        <path d="M12 7.5v4.8l3 1.8" stroke="#fff" strokeWidth="2" strokeLinecap="round" fill="none" />
+      </>
+    );
 
     return (
       <Page>
-        <main className="mx-auto flex max-w-[640px] flex-col items-center px-5 py-10 text-center sm:px-6 sm:py-24">
-          <div
-            className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full"
-            style={{ background: tone }}
-          >
-            {verified ? (
-              <svg width="44" height="44" viewBox="0 0 24 24">
-                <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            ) : failed ? (
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                <path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
-              </svg>
-            ) : (
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8" />
-                <path d="M12 7v5l3 2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
-              </svg>
-            )}
+        <main className={`relative isolate flex min-h-dvh items-center overflow-hidden bg-[#120C0B] ${NAVBAR_OFFSET}`}>
+          <div className="pointer-events-none absolute inset-0 -z-10">
+            <Image
+              src={EVENT.poster}
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="scale-125 object-cover opacity-80 blur-2xl"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,12,11,0.55)_0%,rgba(18,12,11,0.75)_55%,rgba(18,12,11,0.92)_100%)]" />
+            <div
+              className="absolute left-1/2 top-[-120px] h-[340px] w-[560px] -translate-x-1/2 rounded-full"
+              style={{ background: `radial-gradient(closest-side, ${tone.ring}, transparent)` }}
+            />
           </div>
-          <h1 className="m-0 mt-7 text-[36px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[56px]">
-            {heading}
-          </h1>
-          <p className="mt-3.5 max-w-[48ch] text-[17px] leading-relaxed text-[#6B6B6B]">{lead}</p>
 
-          {failed && existing.note && (
-            <div className="mt-5 w-full max-w-[460px] rounded-xl bg-[#FDECEA] px-5 py-3.5 text-left text-sm leading-relaxed text-[#B71C14]">
-              <span className="font-bold">Reason:</span> {existing.note}
+          <div className="relative mx-auto flex w-full max-w-[420px] flex-col items-center px-5 py-6 sm:py-12">
+            <div
+              className="flex h-12 w-12 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full"
+              style={{ background: tone.solid, boxShadow: `0 0 0 6px ${tone.ring}` }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" className="h-6 w-6">
+                {statusIcon}
+              </svg>
             </div>
-          )}
+            <h1 className="m-0 mt-3.5 animate-[hwUp_0.6s_ease-out_0.15s_both] text-center text-[32px] font-black leading-none tracking-[-0.045em] text-white sm:text-[40px]">
+              {heading}
+            </h1>
+            <p className="mt-2 max-w-[34ch] animate-[hwUp_0.6s_ease-out_0.25s_both] text-center text-[14px] leading-snug text-white/65">
+              {lead}
+            </p>
 
-          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#EDE6E3] bg-[#FAF7F5] px-4 py-2 text-sm">
-            {existing.ticketCode && (
-              <span className="font-bold tabular-nums" style={failed ? { textDecoration: "line-through", color: "#9A918D" } : undefined}>
-                {existing.ticketCode}
-              </span>
-            )}
-            {existing.ticketCode && <span className="text-[#B5ADA9]">·</span>}
-            <span className="text-[#6B6B6B]">{EXISTING_LABEL[existing.status]}</span>
-          </div>
+            {/* Ticket */}
+            <div className="mt-5 w-full animate-[hwUp_0.7s_ease-out_0.35s_both] text-left drop-shadow-[0_24px_36px_rgba(0,0,0,0.5)] sm:mt-7">
+              <div className="overflow-hidden rounded-t-[22px] bg-white" style={notch("bottom")}>
+                <div className="relative aspect-[19/10] overflow-hidden bg-[#141414]">
+                  <Image
+                    src={EVENT.poster}
+                    alt={EVENT.posterAlt}
+                    fill
+                    priority
+                    sizes="420px"
+                    className={`object-cover object-top ${failed ? "grayscale-[0.7]" : ""}`}
+                  />
+                  <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(20,20,20,0.45),transparent)]" />
+                  <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2">
+                    <span className="rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-bold tracking-[0.16em] text-white backdrop-blur-md">
+                      E-TICKET
+                    </span>
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold"
+                      style={{ background: tone.bg, color: tone.fg }}
+                    >
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${!verified && !failed ? "animate-[hwPulse_1.4s_ease_infinite]" : ""}`}
+                        style={{ background: tone.solid }}
+                      />
+                      {verified ? "Verified" : failed ? (retry ? "Payment failed" : "Declined") : "Verification pending"}
+                    </span>
+                  </div>
+                </div>
 
-          {retry ? (
-            <>
-              <button onClick={() => setExisting(null)} className={`mt-8 ${btn}`}>
-                Register again →
-              </button>
-              <Link href="/dashboard" className="mt-6 text-sm font-bold text-[#6B6B6B]">
-                Back to My Tickets
-              </Link>
-            </>
-          ) : (
-            <>
-              <Link href="/dashboard" className={`mt-8 ${btn}`}>
-                Go to My Tickets →
-              </Link>
-              {failed && (
+                <div className="px-4 pt-4 sm:px-5">
+                  <div className="text-[26px] font-black leading-none tracking-[-0.045em]">{name}</div>
+                  <div className="mt-1 text-[13px] font-bold text-[#E5251B]">{EVENT.presenter}</div>
+                </div>
+
+                <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[#EDE6E3] px-4 pb-5 pt-3.5 sm:px-5">
+                  {[
+                    { label: "DATE", value: EVENT.dateLabel },
+                    { label: "TIME", value: EVENT.timeLabel },
+                  ].map((d) => (
+                    <div key={d.label} className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">{d.label}</div>
+                      <div className="mt-0.5 truncate text-[14px] font-bold leading-snug">{d.value}</div>
+                    </div>
+                  ))}
+                  <a
+                    href={EVENT.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="col-span-2 flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F5] px-3 py-2.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-none text-[#E5251B]">
+                        <path
+                          d="M12 21s-7-6.2-7-11.5A7 7 0 0112 2.5a7 7 0 017 7C19 14.8 12 21 12 21z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <circle cx="12" cy="9.5" r="2.5" stroke="currentColor" strokeWidth="2" />
+                      </svg>
+                      <span className="truncate text-[13px] font-bold">{EVENT.venue}</span>
+                    </span>
+                    <span className="flex-none text-[12px] font-bold text-[#E5251B]">Directions →</span>
+                  </a>
+                  {failed && existing.note && (
+                    <div className="col-span-2 rounded-xl bg-[#FDECEA] px-3 py-2.5 text-[13px] leading-snug text-[#B71C14]">
+                      <span className="font-bold">Reason:</span> {existing.note}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-b-[22px] bg-white" style={notch("top")}>
+                <div className="mx-5 border-t-2 border-dashed border-[#EDE6E3]" />
+                <div className="flex items-center gap-4 px-4 pb-4 pt-4 sm:px-5">
+                  <div className="relative flex h-[108px] w-[108px] flex-none items-center justify-center overflow-hidden rounded-xl border border-[#EDE6E3] bg-white p-2">
+                    {existing.ticketCode && !failed ? (
+                      <div style={verified ? undefined : { filter: "blur(5px)", opacity: 0.4 }}>
+                        <QRCodeSVG value={existing.ticketCode} size={112} className="h-[92px] w-[92px]" />
+                      </div>
+                    ) : (
+                      <div className="h-full w-full rounded-lg bg-[repeating-linear-gradient(45deg,#FDECEA_0_6px,#FFF8F7_6px_12px)]" />
+                    )}
+                    {!verified && (
+                      <span
+                        className="absolute flex h-10 w-10 items-center justify-center rounded-full"
+                        style={{ background: tone.bg }}
+                      >
+                        {failed ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <path d="M7 7l10 10M17 7L7 17" stroke={tone.fg} strokeWidth="2.4" strokeLinecap="round" />
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                            <rect x="5" y="11" width="14" height="9" rx="2" stroke={tone.fg} strokeWidth="2" />
+                            <path d="M8 11V8a4 4 0 018 0v3" stroke={tone.fg} strokeWidth="2" strokeLinecap="round" />
+                          </svg>
+                        )}
+                      </span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">BOOKING ID</div>
+                    <div
+                      className="mt-0.5 font-mono text-[19px] font-bold tracking-[-0.02em] tabular-nums"
+                      style={failed ? { textDecoration: "line-through", color: "#9A918D" } : undefined}
+                    >
+                      {existing.ticketCode ?? "—"}
+                    </div>
+                    <div className="mt-1.5 text-[12px] leading-snug text-[#6B6B6B]">{stubNote}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid w-full animate-[hwUp_0.6s_ease-out_0.5s_both] grid-cols-2 gap-3 sm:mt-7">
+              {retry ? (
+                <button onClick={() => setExisting(null)} className={`${btn} col-span-2 !h-12 !px-3 text-sm`}>
+                  Register again →
+                </button>
+              ) : (
+                <Link href="/dashboard" className={`${btn} !h-12 !px-3 text-sm ${failed ? "" : "col-span-2"}`}>
+                  Go to My Tickets →
+                </Link>
+              )}
+              {failed && !retry && (
                 <button
                   type="button"
                   onClick={() => setSupportOpen(true)}
-                  className="mt-6 text-sm font-bold text-[#E5251B]"
+                  className="inline-flex h-12 items-center justify-center rounded-full border border-white/35 bg-white/10 px-3 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-white hover:text-[#141414]"
                 >
                   Contact support
                 </button>
               )}
-              <Link href="/" className="mt-6 text-sm font-bold text-[#6B6B6B]">
-                Back to event page
-              </Link>
-            </>
-          )}
+            </div>
+            <Link
+              href={retry ? "/dashboard" : "/"}
+              className="mt-4 text-[13px] font-bold text-white/60 hover:text-white"
+            >
+              {retry ? "Back to My Tickets" : "Back to event page"}
+            </Link>
+          </div>
         </main>
         <SupportModal
           open={supportOpen}
@@ -699,19 +830,10 @@ export default function RegisterForm({
       { label: "ATTENDEE", value: who },
       { label: "TICKET", value: ticketResult.tierName ?? selectedTier?.name ?? "" },
     ];
-    // Cuts the two half-circle notches into the edges of each ticket half, so the
-    // poster backdrop shows through them.
-    const notch = (edge: "top" | "bottom") => {
-      const y = edge === "top" ? "0" : "100%";
-      const mask =
-        `radial-gradient(circle at 0 ${y}, transparent 11px, #000 11.5px) left / 51% 100% no-repeat, ` +
-        `radial-gradient(circle at 100% ${y}, transparent 11px, #000 11.5px) right / 51% 100% no-repeat`;
-      return { WebkitMask: mask, mask } as React.CSSProperties;
-    };
 
     return (
       <Page>
-        <main className="relative isolate flex min-h-[calc(100dvh-69px)] items-center overflow-hidden bg-[#120C0B]">
+        <main className={`relative isolate flex min-h-dvh items-center overflow-hidden bg-[#120C0B] ${NAVBAR_OFFSET}`}>
           {/* Poster backdrop: blurred and darkened so the ticket stays the focus */}
           <div className="pointer-events-none absolute inset-0 -z-10">
             <Image
@@ -783,16 +905,16 @@ export default function RegisterForm({
             {/* Ticket */}
             <div className="mt-5 w-full animate-[hwUp_0.7s_ease-out_0.7s_both] text-left drop-shadow-[0_24px_36px_rgba(0,0,0,0.5)] sm:mt-7">
               <div className="overflow-hidden rounded-t-[22px] bg-white" style={notch("bottom")}>
-                <div className="relative h-[170px] overflow-hidden bg-[#141414] sm:h-[190px]">
+                <div className="relative aspect-[19/10] overflow-hidden bg-[#141414]">
                   <Image
                     src={EVENT.poster}
                     alt={EVENT.posterAlt}
                     fill
                     priority
                     sizes="420px"
-                    className="object-cover object-[center_40%]"
+                    className="object-cover object-top"
                   />
-                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,20,20,0.45)_0%,rgba(20,20,20,0)_30%,rgba(20,20,20,0.1)_55%,rgba(20,20,20,0.9)_100%)]" />
+                  <div className="absolute inset-x-0 top-0 h-16 bg-[linear-gradient(180deg,rgba(20,20,20,0.45),transparent)]" />
                   <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2">
                     <span className="rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-bold tracking-[0.16em] text-white backdrop-blur-md">
                       E-TICKET
@@ -802,17 +924,16 @@ export default function RegisterForm({
                       Verification pending
                     </span>
                   </div>
-                  <div className="absolute inset-x-4 bottom-3.5">
-                    <div className="text-[34px] font-black leading-[0.95] tracking-[-0.05em] text-white">
-                      {ticketResult.eventName ?? EVENT.name}
-                    </div>
-                    <div className="mt-1 text-[13px] font-bold tracking-[-0.01em] text-[#FF6A5F]">
-                      {EVENT.presenter}
-                    </div>
-                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 pb-5 pt-4 sm:px-5">
+                <div className="px-4 pt-4 sm:px-5">
+                  <div className="text-[26px] font-black leading-none tracking-[-0.045em]">
+                    {ticketResult.eventName ?? EVENT.name}
+                  </div>
+                  <div className="mt-1 text-[13px] font-bold text-[#E5251B]">{EVENT.presenter}</div>
+                </div>
+
+                <div className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[#EDE6E3] px-4 pb-5 pt-3.5 sm:px-5">
                   {details.map((d) => (
                     <div key={d.label} className="min-w-0">
                       <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">
@@ -1362,20 +1483,7 @@ function Page({ children }: { children: ReactNode }) {
       className="min-h-screen bg-white text-[#141414]"
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="sticky top-0 z-20 border-b border-[#EDE6E3] bg-white">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-3.5 sm:px-6 sm:py-[18px]">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]"
-          >
-            heatwave
-            <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
-          </Link>
-          <Link href="/" className="flex h-10 items-center text-sm font-medium text-[#6B6B6B] hover:text-[#141414]">
-            ← Back to event
-          </Link>
-        </div>
-      </header>
+      <Navbar />
       {children}
     </div>
   );
