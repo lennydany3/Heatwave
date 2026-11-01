@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import AuthModal from "@/components/auth/AuthModal";
+import SupportModal from "@/components/SupportModal";
 import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
 
@@ -92,6 +93,7 @@ export default function EventPage({
 }) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
+  const [supportOpen, setSupportOpen] = useState(false);
   const [tiers, setTiers] = useState<Tier[]>(
     initialTiers && initialTiers.length > 0 ? initialTiers : FALLBACK_TIERS
   );
@@ -465,9 +467,13 @@ export default function EventPage({
             <Link href="/privacy" className="text-[#6B6B6B] hover:text-[#141414]">
               Privacy
             </Link>
-            <a href="mailto:support@heatwave.in" className="text-[#6B6B6B] hover:text-[#141414]">
+            <button
+              type="button"
+              onClick={() => setSupportOpen(true)}
+              className="text-[#6B6B6B] hover:text-[#141414]"
+            >
               Contact
-            </a>
+            </button>
           </span>
         </div>
       </footer>
@@ -499,6 +505,8 @@ export default function EventPage({
           </button>
         </div>
       </div>
+
+      <SupportModal open={supportOpen} onClose={() => setSupportOpen(false)} />
 
       <AuthModal
         open={authOpen}

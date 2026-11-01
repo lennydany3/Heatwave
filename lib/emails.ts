@@ -1,6 +1,7 @@
 import "server-only";
 import QRCode from "qrcode";
 import { EVENT } from "@/lib/event";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/support";
 import { emailButton, emailLayout, emailParagraph, esc, sendMail } from "@/lib/mail";
 
 const when = (iso: string | null | undefined) =>
@@ -122,7 +123,7 @@ export async function sendVerificationEmail(opts: {
     opts.reason
       ? `<tr><td style="padding:16px 32px 0"><div style="background:${bg};border-radius:10px;padding:12px 16px;font-size:14px;line-height:1.5;color:${color}"><b>Reason:</b> ${esc(opts.reason)}</div></td></tr>`
       : "";
-  const support = `If you think this is a mistake, reply to this email or write to <a href="mailto:support@heatwave.in" style="color:#E5251B">support@heatwave.in</a> with your booking ID${opts.ticketCode ? ` (${esc(opts.ticketCode)})` : ""} and UPI transaction ID.`;
+  const support = `If you think this is a mistake, write to <a href="mailto:${SUPPORT_EMAIL}" style="color:#E5251B">${SUPPORT_EMAIL}</a> or call <a href="tel:${SUPPORT_PHONE.replace(/\s/g, "")}" style="color:#E5251B">${SUPPORT_PHONE}</a> with your booking ID${opts.ticketCode ? ` (${esc(opts.ticketCode)})` : ""} and UPI transaction ID.`;
 
   if (opts.outcome === "accepted") {
     const body =
@@ -157,7 +158,7 @@ export async function sendVerificationEmail(opts: {
       text:
         `Hi ${first}, we couldn't approve your registration for ${EVENT.name}.\n` +
         (opts.reason ? `Reason: ${opts.reason}\n` : "") +
-        `Questions? support@heatwave.in (booking ID ${opts.ticketCode ?? "-"}).`,
+        `Questions? ${SUPPORT_EMAIL} or ${SUPPORT_PHONE} (booking ID ${opts.ticketCode ?? "-"}).`,
     });
   }
 
@@ -177,7 +178,7 @@ export async function sendVerificationEmail(opts: {
       text:
         `Hi ${first}, your payment for ${EVENT.name} was unsuccessful.\n` +
         (opts.reason ? `Reason: ${opts.reason}\n` : "") +
-        `If money was deducted, contact support@heatwave.in with your UPI transaction ID.`,
+        `If money was deducted, contact ${SUPPORT_EMAIL} or ${SUPPORT_PHONE} with your UPI transaction ID.`,
     });
   }
 

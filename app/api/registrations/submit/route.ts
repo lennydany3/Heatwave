@@ -113,19 +113,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "No price set for this tier" }, { status: 400 });
   }
 
-  const { data: existing } = await admin
-    .from("registrations")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("event_id", tier.event_id)
-    .neq("status", "cancelled")
-    .limit(1);
+  // One registration per account, except that an *unsuccessful* payment (it never
+  // reached the account) can be retried: the old attempt is cancelled and replaced.
+  // A declined registration can't be retried.
+  const findExisting = (select: string) =>
+    admin
+      .from("registrations")
+      .select(select)
+      .eq("user_id", user.id)
+      .eq("event_id", tier.event_id)
+      .neq("status", "cancelled")
+      .limit(1);
+  let existingRes = await findExisting("id, status, verification_decision");
+  if (existingRes.error) existingRes = await findExisting("id, status"); // decision column not added yet
+  const existing = (existingRes.data ?? []) as unknown as {
+    id: string;
+    status: string;
+    verification_decision?: string | null;
+  }[];
 
-  if (existing && existing.length > 0) {
-    return NextResponse.json(
-      { error: ALREADY_REGISTERED, code: "already_registered" },
-      { status: 409 }
-    );
+  if (existing.length > 0) {
+    const old = existing[0];
+    const retryable = old.status === "failed" && old.verification_decision === "unsuccessful";
+    if (!retryable) {
+      return NextResponse.json(
+        { error: ALREADY_REGISTERED, code: "already_registered" },
+        { status: 409 }
+      );
+    }
+    await admin.from("registrations").update({ status: "cancelled" }).eq("id", old.id);
+    await admin.from("tickets").update({ status: "cancelled" }).eq("registration_id", old.id);
   }
 
   const seats = (await eventSeats(admin, tier.event_id)).find((x) => x.tierId === tier.id);

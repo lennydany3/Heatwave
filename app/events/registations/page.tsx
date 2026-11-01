@@ -3,6 +3,7 @@ import { createAdminClient } from "@/utils/supabase/admin";
 import { EVENT } from "@/lib/event";
 import { getEventData } from "@/lib/eventData";
 import { myWaitlist } from "@/lib/seats";
+import { verifyState, type Decision } from "@/lib/verification";
 import RegisterForm, { type ExistingRegistration, type InitialWaitlist } from "./RegisterForm";
 
 const EVENT_SLUG = EVENT.slug;
@@ -19,24 +20,34 @@ async function findExistingRegistration(
 ): Promise<ExistingRegistration | null> {
   if (!user) return null;
 
-  const { data } = await admin
-    .from("registrations")
-    .select("status, tickets(ticket_code), events!inner(slug, name)")
-    .eq("user_id", user.id)
-    .eq("events.slug", EVENT_SLUG)
-    .neq("status", "cancelled")
-    .order("created_at", { ascending: false })
-    .limit(1);
+  const load = (select: string) =>
+    admin
+      .from("registrations")
+      .select(select)
+      .eq("user_id", user.id)
+      .eq("events.slug", EVENT_SLUG)
+      .neq("status", "cancelled")
+      .order("created_at", { ascending: false })
+      .limit(1);
+  const base = "status, verification_note, tickets(ticket_code), events!inner(slug, name)";
+  let res = await load(`${base}, verification_decision`);
+  if (res.error) res = await load(base); // decision column not added yet
+  const data = (res.data ?? []) as unknown as Record<string, unknown>[];
 
-  const row = data?.[0];
+  const row = data[0];
   if (!row) return null;
 
-  const tickets = row.tickets as unknown as { ticket_code: string }[] | null;
-  const event = row.events as unknown as { name: string } | null;
+  const status = row.status as ExistingRegistration["status"];
+  const decision = verifyState(status, (row.verification_decision as Decision | null | undefined) ?? null);
+  const tickets = row.tickets as { ticket_code: string }[] | null;
+  const event = row.events as { name: string } | null;
   return {
-    status: row.status as ExistingRegistration["status"],
+    status,
     ticketCode: tickets?.[0]?.ticket_code ?? null,
     eventName: event?.name ?? null,
+    note: (row.verification_note as string | null) ?? null,
+    // An unsuccessful payment can be retried; a declined registration can't.
+    canRetry: decision === "unsuccessful",
   };
 }
 

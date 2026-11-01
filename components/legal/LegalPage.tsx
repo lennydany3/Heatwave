@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function LegalPage({
   title,
@@ -50,7 +51,7 @@ export default function LegalPage({
             <Link href="/privacy" className="text-[#6B6B6B] hover:text-[#141414]">
               Privacy
             </Link>
-            <a href="mailto:support@heatwave.in" className="text-[#6B6B6B] hover:text-[#141414]">
+            <a href={`mailto:${SUPPORT_EMAIL}`} className="text-[#6B6B6B] hover:text-[#141414]">
               Contact
             </a>
           </span>

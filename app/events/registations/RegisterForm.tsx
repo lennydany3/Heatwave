@@ -10,6 +10,8 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import SupportModal from "@/components/SupportModal";
+import { compressImage, formatBytes } from "@/lib/compressImage";
 import { EVENT } from "@/lib/event";
 import type { EventData } from "@/lib/eventData";
 import { createClient } from "@/utils/supabase/client";
@@ -60,11 +62,18 @@ export type ExistingRegistration = {
   status: "pending" | "paid" | "failed";
   ticketCode: string | null;
   eventName: string | null;
+  /** The admin's reason (declined / unsuccessful payments). */
+  note?: string | null;
+  /** True when the payment was unsuccessful, so the customer may register again. */
+  canRetry?: boolean;
 };
 
 const UPI_ID = process.env.NEXT_PUBLIC_UPI_ID ?? "";
 const UPI_PAYEE_NAME = process.env.NEXT_PUBLIC_UPI_PAYEE_NAME ?? "Heatwave";
 const UPI_TXN_RE = /^\d{12}$/;
+// Raw files up to 15 MB are accepted and compressed in the browser; what gets
+// uploaded (and must stay under the server's 5 MB cap) is the compressed result.
+const MAX_RAW_PROOF_BYTES = 15 * 1024 * 1024;
 const MAX_PROOF_BYTES = 5 * 1024 * 1024;
 const PROOF_TYPES = ["image/png", "image/jpeg", "image/webp", "image/heic", "image/heif"];
 const PREVIEWABLE = ["image/png", "image/jpeg", "image/webp"];
@@ -261,6 +270,7 @@ export default function RegisterForm({
   );
   const [joining, setJoining] = useState(false);
   const [waitlistError, setWaitlistError] = useState("");
+  const [supportOpen, setSupportOpen] = useState(false);
   // Already queued (from the server) or just joined: show the waiting screen
   // instead of the form. An invited customer sees the normal form instead.
   const [waitlisted, setWaitlisted] = useState<{ position: number | null } | null>(
@@ -273,6 +283,8 @@ export default function RegisterForm({
   const [proof, setProof] = useState<File | null>(null);
   const [proofPreview, setProofPreview] = useState("");
   const [proofError, setProofError] = useState("");
+  const [compressing, setCompressing] = useState(false);
+  const [proofNote, setProofNote] = useState("");
   const [payTouched, setPayTouched] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -433,7 +445,7 @@ export default function RegisterForm({
   const showTxnError = (txnTouched || payTouched) && focus !== "upiTxnId" ? txnError : "";
   const proofMissing = payTouched && !proof ? "Upload your payment screenshot" : "";
 
-  function onProofChange(e: ChangeEvent<HTMLInputElement>) {
+  async function onProofChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     e.target.value = "";
     if (!file) return;
@@ -441,13 +453,25 @@ export default function RegisterForm({
       setProofError("Screenshot must be a PNG, JPG, WEBP or HEIC image");
       return;
     }
-    if (file.size > MAX_PROOF_BYTES) {
-      setProofError("Screenshot must be under 5 MB");
+    if (file.size > MAX_RAW_PROOF_BYTES) {
+      setProofError("Screenshot must be under 15 MB");
       return;
     }
     setProofError("");
-    setProof(file);
-    setProofPreview(PREVIEWABLE.includes(file.type) ? URL.createObjectURL(file) : "");
+    setCompressing(true);
+    const result = await compressImage(file);
+    setCompressing(false);
+    if (result.file.size > MAX_PROOF_BYTES) {
+      setProofError("This image is still too large after compression. Try a smaller screenshot.");
+      return;
+    }
+    setProof(result.file);
+    setProofNote(
+      result.compressed
+        ? `Compressed ${formatBytes(result.originalBytes)} → ${formatBytes(result.file.size)}`
+        : ""
+    );
+    setProofPreview(PREVIEWABLE.includes(result.file.type) ? URL.createObjectURL(result.file) : "");
   }
 
   async function copyUpiId() {
@@ -558,44 +582,104 @@ export default function RegisterForm({
   }
 
   if (existing && !ticketResult) {
+    const failed = existing.status === "failed";
+    const verified = existing.status === "paid";
+    const retry = failed && !!existing.canRetry;
+    const name = existing.eventName ?? event?.name ?? "this event";
+    const tone = failed ? "#E5251B" : verified ? "#3F8A5A" : "#D99A1E";
+
+    const heading = verified
+      ? "You're registered"
+      : failed
+        ? retry
+          ? "Your payment wasn't successful"
+          : "We couldn't approve your registration"
+        : "Registration received";
+    const lead = verified
+      ? `Your payment for ${name} is verified and your ticket is confirmed.`
+      : failed
+        ? retry
+          ? `We couldn't find your payment for ${name} in our account, so your ticket isn't valid yet. You can register again with a fresh payment.`
+          : `We reviewed your registration for ${name} and couldn't approve it, so this ticket isn't valid at the gate.`
+        : `We have your registration for ${name}. We're verifying your UPI payment — your QR works at the gate once it's verified.`;
+
     return (
       <Page>
         <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
-          <div className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#141414]">
-            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M3 8a2 2 0 012-2h14a2 2 0 012 2v2a2 2 0 000 4v2a2 2 0 01-2 2H5a2 2 0 01-2-2v-2a2 2 0 000-4V8z"
-                stroke="#fff"
-                strokeWidth="1.8"
-                strokeLinejoin="round"
-              />
-              <path d="M14 6v12" stroke="#fff" strokeWidth="1.8" strokeDasharray="2 2" />
-            </svg>
+          <div
+            className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full"
+            style={{ background: tone }}
+          >
+            {verified ? (
+              <svg width="44" height="44" viewBox="0 0 24 24">
+                <path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            ) : failed ? (
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                <path d="M6 6l12 12M18 6L6 18" stroke="#fff" strokeWidth="2.6" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+                <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8" />
+                <path d="M12 7v5l3 2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            )}
           </div>
-          <h1 className="m-0 mt-7 text-[40px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[60px]">
-            You&apos;re already registered
+          <h1 className="m-0 mt-7 text-[36px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[56px]">
+            {heading}
           </h1>
-          <p className="mt-3.5 text-[17px] leading-relaxed text-[#6B6B6B]">
-            This account already has a ticket for{" "}
-            <span className="font-medium text-[#141414]">
-              {existing.eventName ?? event?.name ?? "this event"}
-            </span>
-            . Only one registration is allowed per account — check your ticket in My Tickets.
-          </p>
+          <p className="mt-3.5 max-w-[48ch] text-[17px] leading-relaxed text-[#6B6B6B]">{lead}</p>
+
+          {failed && existing.note && (
+            <div className="mt-5 w-full max-w-[460px] rounded-xl bg-[#FDECEA] px-5 py-3.5 text-left text-sm leading-relaxed text-[#B71C14]">
+              <span className="font-bold">Reason:</span> {existing.note}
+            </div>
+          )}
+
           <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-2 rounded-full border border-[#EDE6E3] bg-[#FAF7F5] px-4 py-2 text-sm">
             {existing.ticketCode && (
-              <span className="font-bold tabular-nums">{existing.ticketCode}</span>
+              <span className="font-bold tabular-nums" style={failed ? { textDecoration: "line-through", color: "#9A918D" } : undefined}>
+                {existing.ticketCode}
+              </span>
             )}
             {existing.ticketCode && <span className="text-[#B5ADA9]">·</span>}
             <span className="text-[#6B6B6B]">{EXISTING_LABEL[existing.status]}</span>
           </div>
-          <Link href="/dashboard" className={`mt-8 ${btn}`}>
-            Go to My Tickets →
-          </Link>
-          <Link href="/" className="mt-7 text-sm font-bold text-[#6B6B6B]">
-            Back to event page
-          </Link>
+
+          {retry ? (
+            <>
+              <button onClick={() => setExisting(null)} className={`mt-8 ${btn}`}>
+                Register again →
+              </button>
+              <Link href="/dashboard" className="mt-6 text-sm font-bold text-[#6B6B6B]">
+                Back to My Tickets
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link href="/dashboard" className={`mt-8 ${btn}`}>
+                Go to My Tickets →
+              </Link>
+              {failed && (
+                <button
+                  type="button"
+                  onClick={() => setSupportOpen(true)}
+                  className="mt-6 text-sm font-bold text-[#E5251B]"
+                >
+                  Contact support
+                </button>
+              )}
+              <Link href="/" className="mt-6 text-sm font-bold text-[#6B6B6B]">
+                Back to event page
+              </Link>
+            </>
+          )}
         </main>
+        <SupportModal
+          open={supportOpen}
+          onClose={() => setSupportOpen(false)}
+          bookingId={existing.ticketCode}
+        />
       </Page>
     );
   }
@@ -1057,10 +1141,10 @@ export default function RegisterForm({
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-bold">
-                        {proof ? proof.name : "Upload payment screenshot"}
+                        {compressing ? "Compressing…" : proof ? proof.name : "Upload payment screenshot"}
                       </span>
                       <span className="block text-[13px] text-[#6B6B6B]">
-                        PNG, JPG, WEBP or HEIC · up to 5 MB
+                        {proofNote || "PNG, JPG, WEBP or HEIC · up to 15 MB · compressed automatically"}
                       </span>
                     </span>
                     <span className="flex-none text-sm font-bold text-[#E5251B]">
@@ -1097,7 +1181,7 @@ export default function RegisterForm({
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={submitting || !UPI_ID}
+                    disabled={submitting || compressing || !UPI_ID}
                     className={`min-w-[200px] justify-center ${btn}`}
                   >
                     {submitting ? (

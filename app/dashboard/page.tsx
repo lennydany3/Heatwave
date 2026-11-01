@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import SupportModal from "@/components/SupportModal";
 import { createClient } from "@/utils/supabase/client";
 
 type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in" | "Verifying" | "Payment failed";
@@ -35,6 +36,8 @@ type Ticket = {
   upiTxnId: string | null;
   tab: TabId;
   startsAt: string | null;
+  /** True when the payment was unsuccessful (not declined), so the customer can register again. */
+  canRetry?: boolean;
 };
 
 type TicketRow = {
@@ -72,8 +75,13 @@ function PaymentNotice({ t, className = "" }: { t: Ticket; className?: string })
   if (t.status === "Payment failed") {
     return (
       <div className={`rounded-xl bg-[#FDECEA] px-4 py-3 text-sm leading-relaxed text-[#B71C14] ${className}`}>
-        <span className="font-bold">Payment couldn&apos;t be verified.</span>{" "}
-        {t.note || "Please contact support with your UPI transaction ID."}
+        <span className="font-bold">
+          {t.canRetry ? "Payment wasn't successful." : "Registration couldn't be approved."}
+        </span>{" "}
+        {t.note ||
+          (t.canRetry
+            ? "We couldn't find your payment. You can register again with a fresh payment."
+            : "Please contact support with your UPI transaction ID.")}
       </div>
     );
   }
@@ -89,6 +97,63 @@ function relativeWhen(iso: string | null): string {
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
 }
+
+// The QR area of a ticket, by state: only a verified ticket shows a scannable QR.
+// A ticket still being verified shows it locked; a failed one shows no QR at all.
+function TicketStub({ t, size }: { t: Ticket; size: number }) {
+  const box = size + 24;
+  if (t.status === "Payment failed") {
+    return (
+      <div
+        style={{ width: box, height: box }}
+        className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#F3C9C5] bg-[#FFF8F7] p-3 text-center"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FDECEA]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="#B71C14" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span className="text-sm font-black text-[#B71C14]">Ticket not valid</span>
+        <span className="text-[11px] leading-snug text-[#9A6A66]">No QR is issued for a failed payment</span>
+      </div>
+    );
+  }
+  const locked = t.status === "Verifying";
+  return (
+    <div
+      style={{ width: box, height: box }}
+      className="relative flex items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3"
+    >
+      <div style={locked ? { filter: "blur(5px)", opacity: 0.45 } : undefined}>
+        <QRCodeSVG value={t.bid} size={size} />
+      </div>
+      {locked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF6E5]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="11" width="14" height="9" rx="2" stroke="#8A5A00" strokeWidth="2" />
+              <path d="M8 11V8a4 4 0 018 0v3" stroke="#8A5A00" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="text-xs font-black text-[#8A5A00]">Activates once verified</span>
+        </div>
+      )}
+      {t.status === "Checked-in" && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80 text-sm font-black text-[#141414]">
+          Already used
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ACCENT: Record<TicketStatus, string> = {
+  Confirmed: "#E5251B",
+  "Checked-in": "#141414",
+  Cancelled: "#B5ADA9",
+  Verifying: "#D99A1E",
+  "Payment failed": "#B71C14",
+};
 
 function PlaceholderThumb({ className = "" }: { className?: string }) {
   return (
@@ -151,6 +216,9 @@ export default function DashboardPage() {
   const [tab, setTab] = useState<TabId>("upcoming");
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [supportFor, setSupportFor] = useState<string | null>(null);
+  // The admin's outcome per ticket code, to tell "try again" from "contact support".
+  const [retryable, setRetryable] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -241,6 +309,27 @@ export default function DashboardPage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/registrations/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.registrations) return;
+        setRetryable(
+          Object.fromEntries(
+            (d.registrations as { ticketCode: string | null; canRetry: boolean }[])
+              .filter((r) => r.ticketCode)
+              .map((r) => [r.ticketCode as string, r.canRetry])
+          )
+        );
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   function showToast(msg: string) {
     clearTimeout(toastTimer.current);
     setToastMsg(msg);
@@ -256,12 +345,16 @@ export default function DashboardPage() {
     showToast("Calendar file downloaded");
   }
 
-  const inTab = useMemo(() => tickets.filter((t) => t.tab === tab), [tickets, tab]);
+  const view = useMemo(
+    () => tickets.map((t) => ({ ...t, canRetry: !!retryable[t.bid] })),
+    [tickets, retryable]
+  );
+  const inTab = useMemo(() => view.filter((t) => t.tab === tab), [view, tab]);
   const hl = tab === "upcoming" ? inTab[0] : undefined;
   const rest = hl ? inTab.slice(1) : inTab;
-  const cur = open != null ? tickets.find((t) => t.id === open) ?? null : null;
+  const cur = open != null ? view.find((t) => t.id === open) ?? null : null;
   const counts = { upcoming: 0, past: 0, cancelled: 0 };
-  tickets.forEach((t) => counts[t.tab]++);
+  view.forEach((t) => counts[t.tab]++);
 
   return (
     <div
@@ -402,7 +495,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3.5 flex animate-[hwUp_0.5s_0.1s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white lg:flex-row">
               <div className="flex min-w-0 flex-1">
-                <div className="w-1.5 flex-none bg-[#E5251B]" />
+                <div className="w-1.5 flex-none" style={{ background: ACCENT[hl.status] }} />
                 <div className="min-w-0 flex-1 p-6 sm:p-9">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span
@@ -441,35 +534,63 @@ export default function DashboardPage() {
                       onClick={() => setOpen(hl.id)}
                       className="inline-flex h-12 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6.5 text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
                     >
-                      View ticket
+                      {hl.status === "Payment failed" ? "View details" : "View ticket"}
                     </button>
-                    <button
-                      onClick={() => downloadIcs(hl)}
-                      className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                    >
-                      Add to calendar
-                    </button>
-                    <button
-                      onClick={() =>
-                        window.open(
-                          "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
-                          "_blank"
-                        )
-                      }
-                      className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                    >
-                      Get directions
-                    </button>
+                    {hl.status === "Payment failed" ? (
+                      hl.canRetry ? (
+                        <Link
+                          href="/events/registations"
+                          className="inline-flex h-12 items-center rounded-full border border-[#141414] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Register again
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => setSupportFor(hl.bid)}
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Contact support
+                        </button>
+                      )
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => downloadIcs(hl)}
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Add to calendar
+                        </button>
+                        <button
+                          onClick={() =>
+                            window.open(
+                              "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
+                              "_blank"
+                            )
+                          }
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Get directions
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="relative flex flex-none flex-col items-center justify-center gap-3 border-t border-dashed border-[#E0D6D2] bg-[#FAF7F5] p-7 lg:w-[260px] lg:border-l lg:border-t-0">
                 <span className="absolute -left-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
                 <span className="absolute -right-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white lg:-bottom-3 lg:-left-3 lg:right-auto lg:top-auto" />
-                <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3">
-                  <QRCodeSVG value={hl.bid} size={136} />
+                <TicketStub t={hl} size={136} />
+                <div className="text-center text-xs text-[#6B6B6B]">
+                  {hl.status === "Confirmed"
+                    ? "Scan at entry"
+                    : hl.status === "Verifying"
+                      ? "Pending payment verification"
+                      : hl.status === "Payment failed"
+                        ? "Payment failed"
+                        : hl.status === "Checked-in"
+                          ? "Checked in"
+                          : "Cancelled"}
                 </div>
-                <div className="text-center text-xs text-[#6B6B6B]">Scan at entry</div>
               </div>
             </div>
           </>
@@ -615,9 +736,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-wrap">
               <div className="flex flex-1 basis-[280px] flex-col items-center gap-4 border-r border-[#EDE6E3] bg-[#FAF7F5] p-7">
-                <div className="flex aspect-square w-full max-w-[240px] items-center justify-center rounded-xl border border-[#EDE6E3] bg-white p-4">
-                  <QRCodeSVG value={cur.bid} size={192} />
-                </div>
+                <TicketStub t={cur} size={192} />
                 <div className="text-center">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">BOOKING ID</div>
                   <div className="mt-1 text-lg font-black tracking-[0.02em] tabular-nums">{cur.bid}</div>
@@ -679,6 +798,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <SupportModal open={supportFor !== null} onClose={() => setSupportFor(null)} bookingId={supportFor} />
 
       {toastMsg && (
         <div className="fixed bottom-[92px] left-1/2 z-[60] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white lg:bottom-8">
