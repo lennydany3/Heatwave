@@ -3,6 +3,7 @@
 import jsQR from "jsqr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
+import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
 
 type EventInfo = { id: string; name: string; venue: string | null; starts_at: string | null };
@@ -95,7 +96,7 @@ export default function AdminCheckInPage() {
       const { data: eventRow } = await supabase
         .from("events")
         .select("id, name, venue, starts_at")
-        .eq("slug", "product-builders-summit-2027")
+        .eq("slug", EVENT.slug)
         .single();
       if (cancelled || !eventRow) return;
       setEvent(eventRow);

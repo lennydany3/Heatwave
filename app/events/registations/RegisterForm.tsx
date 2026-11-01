@@ -10,6 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
 
 type FieldKey = "fullName" | "email" | "mobile" | "instagram" | "age";
@@ -114,8 +115,8 @@ function EventThumb({ className = "" }: { className?: string }) {
       className={`relative overflow-hidden rounded-lg border border-[#EDE6E3] bg-[#F3EEEB] ${className}`}
     >
       <Image
-        src="/images/sample-poster.jpeg"
-        alt="Product Builders Summit 2027 event poster"
+        src={EVENT.poster}
+        alt={EVENT.posterAlt}
         fill
         sizes="380px"
         className="object-cover"
@@ -244,7 +245,7 @@ export default function RegisterForm({
       const { data: eventRow } = await supabase
         .from("events")
         .select("id, name, venue, starts_at")
-        .eq("slug", "product-builders-summit-2027")
+        .eq("slug", EVENT.slug)
         .single();
       if (!eventRow) {
         setTiersLoading(false);
@@ -574,6 +575,18 @@ export default function RegisterForm({
               Get your ticket
             </h1>
 
+            <div className="mt-6 flex items-center gap-4 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-3 lg:hidden">
+              <EventThumb className="aspect-[4/5] w-16 flex-none" />
+              <div className="min-w-0 text-sm leading-relaxed text-[#6B6B6B]">
+                <div className="text-base font-black tracking-[-0.02em] text-[#141414]">
+                  {EVENT.name} · {EVENT.presenter}
+                </div>
+                {EVENT.dateLabel} · {EVENT.timeLabel}
+                <br />
+                {EVENT.venueShort}
+              </div>
+            </div>
+
             <div className="mt-8 h-[3px] overflow-hidden rounded-full bg-[#EDE6E3]">
               <div
                 className="h-full rounded-full bg-[#E5251B] transition-[width] duration-500 ease-out"
@@ -597,6 +610,19 @@ export default function RegisterForm({
 
             {step === 0 && (
               <section className="mt-10">
+                <div className="mb-10 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6">
+                  <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">
+                    {EVENT.tagline.toUpperCase()}
+                  </div>
+                  <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-[#6B6B6B]">
+                    {EVENT.description.map((p) => (
+                      <p key={p} className="m-0">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                  <div className="mt-4 text-sm font-bold text-[#141414]">{EVENT.gateNote}</div>
+                </div>
                 <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">
                   Your details
                 </h2>
@@ -698,7 +724,7 @@ export default function RegisterForm({
                             {open && price ? fmt(price) : "× × ×"}
                           </span>
                           <span className="text-sm leading-snug text-[#6B6B6B]">
-                            {open ? "Sale ends soon" : "Dates coming soon"}
+                            {open ? "Limited early-bird price" : "Announced soon"}
                           </span>
                         </button>
                       );
@@ -894,14 +920,17 @@ export default function RegisterForm({
           </div>
 
           <aside className="sticky top-6 hidden w-[380px] flex-none rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-5 lg:block">
-            <EventThumb className="aspect-video w-full" />
-            <div className="mt-[18px] text-xl font-black leading-[1.15] tracking-[-0.025em]">
-              {event?.name ?? "Product Builders Summit 2027"}
+            <EventThumb className="aspect-[4/5] w-full" />
+            <div className="mt-[18px] text-xs font-bold tracking-[0.14em] text-[#E5251B]">
+              {EVENT.presenter.toUpperCase()}
+            </div>
+            <div className="mt-1 text-xl font-black leading-[1.15] tracking-[-0.025em]">
+              {event?.name ?? EVENT.name}
             </div>
             <div className="mt-2 text-sm leading-relaxed text-[#6B6B6B]">
-              Sat, 13 Feb 2027 · 9:30 AM
+              {EVENT.dateLabel} · {EVENT.timeLabel}
               <br />
-              {event?.venue ?? "Bangalore International Centre"}
+              {event?.venue ?? EVENT.venue}
             </div>
             {selectedTier && (
               <div className="mt-5 flex items-baseline justify-between border-t border-[#EDE6E3] pt-4">

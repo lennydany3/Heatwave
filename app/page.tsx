@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, type MouseEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import AuthModal from "@/components/auth/AuthModal";
+import { EVENT } from "@/lib/event";
 
 const btn =
   "inline-flex items-center justify-center gap-2.5 rounded-full text-white font-bold transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
@@ -33,109 +34,43 @@ function Wave({ className = "" }: { className?: string }) {
   );
 }
 
-function PlaceholderImage({
-  label,
-  rounded = "12px",
-  className = "",
-}: {
-  label: string;
-  rounded?: string;
-  className?: string;
-}) {
-  return (
-    <div
-      style={{ borderRadius: rounded, background: "#FAF7F5" }}
-      className={`flex flex-col items-center justify-center gap-2 border border-[#EDE6E3] text-[#B4ACA7] ${className}`}
-    >
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-        <rect
-          x="3"
-          y="3"
-          width="18"
-          height="18"
-          rx="2"
-          stroke="currentColor"
-          strokeWidth="1.5"
-        />
-        <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-        <path
-          d="M21 15l-5-5-11 11"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-      <span className="text-xs font-medium">{label}</span>
-    </div>
-  );
-}
-
 const INFO = [
-  { label: "DATE", value: "Sat, 13 Feb 2027" },
-  { label: "TIME", value: "9:30 AM – 6 PM" },
-  { label: "VENUE", value: "Bangalore Intl. Centre" },
-  { label: "PRICE", value: "From ₹999" },
+  { label: "DATE", value: EVENT.dateLabel },
+  { label: "TIME", value: EVENT.timeLabel },
+  { label: "VENUE", value: EVENT.venueShort },
+  { label: "PRICE", value: "From ₹899" },
 ];
 
-const ABOUT_POINTS = [
-  "14 talks across product, design and engineering",
-  "Hands-on afternoon workshops, capped at 30 seats",
-  "Demo showcase from 20 early-stage teams",
-  "Meals and evening networking included",
+const HIGHLIGHTS = [
+  "A 4-hour cruise on the waters of Muthukadu",
+  "Electrifying vibes and incredible music",
+  "Exclusive activities and experiences onboard",
+  "A few surprises we're keeping under wraps",
 ];
 
-const SCHEDULE = [
-  { time: "09:30", title: "Registration & coffee", sub: "Foyer, ground floor" },
-  {
-    time: "10:15",
-    title: "Opening keynote",
-    sub: "Aditi Rao · Building for the next 500 million",
-  },
-  {
-    time: "11:00",
-    title: "Panel: Shipping in small teams",
-    sub: "Kabir Mehta, Nisha Verghese, Arjun Iyer",
-  },
-  { time: "12:30", title: "Lunch", sub: "Garden terrace" },
-  {
-    time: "13:30",
-    title: "Workshops",
-    sub: "Research sprints · Design systems · Pricing",
-  },
-  { time: "15:30", title: "Fireside chat", sub: "Meera Kapoor in conversation" },
-  { time: "17:00", title: "Demo showcase", sub: "20 teams, 3 minutes each" },
-  { time: "18:00", title: "Close & networking", sub: "Main hall" },
-];
-
-const SPEAKERS = [
-  { name: "Aditi Rao", role: "Design Director, Kite" },
-  { name: "Kabir Mehta", role: "Co-founder, Ledgerly" },
-  { name: "Nisha Verghese", role: "VP Product, Orbit Health" },
-  { name: "Arjun Iyer", role: "Staff Engineer, Paywise" },
-  { name: "Meera Kapoor", role: "Partner, Northlight Ventures" },
+const PRICES = [
+  { name: "Early Bird", male: "₹999", female: "₹899", open: true },
+  { name: "Phase 1", male: "× × ×", female: "× × ×", open: false },
 ];
 
 const FAQS = [
   {
-    q: "Who is this for?",
-    a: "Product managers, designers, engineers and founders. Students are welcome; group tickets work well for college teams.",
+    q: "When should I arrive?",
+    a: "Gate closes at 7:00 PM sharp on Saturday, 12 December, so plan to reach Muthukadu Boat House before then.",
   },
   {
-    q: "Is lunch included?",
-    a: "Yes — lunch, tea breaks and evening networking snacks are included with every ticket.",
+    q: "What's happening onboard?",
+    a: "Four hours of music and electrifying vibes on the water, plus exclusive activities and a few surprises. Some things are better experienced than explained.",
   },
   {
-    q: "Can I transfer my ticket?",
-    a: "Yes, tickets can be transferred to someone else any time before the event — just email us the new attendee's details.",
+    q: "How do I get my ticket?",
+    a: "Register with your details, pay via UPI and upload the screenshot. Your ticket with a QR code appears in My Tickets and activates once we verify the payment.",
   },
   {
-    q: "What is the refund policy?",
-    a: "Full refund until 30 January 2027. After that, tickets can be transferred but not refunded.",
+    q: "Why are prices different for male and female?",
+    a: "Early Bird tickets are ₹899 for female and ₹999 for male. Phase 1 pricing will be announced soon.",
   },
 ];
-
-const SEATS_LEFT = 42;
 
 export default function EventPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
@@ -206,8 +141,8 @@ export default function EventPage() {
               <a href="#about" className="hover:text-[#E5251B]">
                 About
               </a>
-              <a href="#schedule" className="hover:text-[#E5251B]">
-                Schedule
+              <a href="#tickets" className="hover:text-[#E5251B]">
+                Tickets
               </a>
               <a href="#venue" className="hover:text-[#E5251B]">
                 Venue
@@ -245,15 +180,17 @@ export default function EventPage() {
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center gap-14 px-6 py-[72px] pb-[88px]">
           <div className="relative min-w-0 flex-1 basis-[480px] animate-[hwUp_0.6s_ease_both]">
             <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#6B6B6B]">
-              Conference · Bengaluru
+              Cruise party · Chennai
             </div>
             <div className="relative mt-5">
               <div className="pointer-events-none absolute -left-6 -right-6 top-[56%] h-[120px] -translate-y-1/2 overflow-hidden">
                 <Wave />
               </div>
               <h1 className="relative m-0 text-[56px] font-black leading-[0.9] tracking-[-0.055em] [text-wrap:balance] sm:text-[80px] lg:text-[112px]">
-                Product Builders Summit{" "}
-                <span className="text-[#E5251B]">2027</span>
+                {EVENT.name}
+                <span className="block text-[0.32em] leading-[1.1] tracking-[-0.03em] text-[#E5251B]">
+                  {EVENT.presenter}
+                </span>
               </h1>
             </div>
 
@@ -277,17 +214,14 @@ export default function EventPage() {
               >
                 Register now <span>→</span>
               </button>
-              <span className="text-sm text-[#6B6B6B]">
-                <span className="font-bold text-[#141414]">{SEATS_LEFT}</span>{" "}
-                seats left
-              </span>
+              <span className="text-sm text-[#6B6B6B]">{EVENT.gateNote}</span>
             </div>
           </div>
 
           <div className="relative min-w-0 flex-1 basis-[420px] aspect-[4/5] max-h-[620px] w-full overflow-hidden rounded-xl border border-[#EDE6E3]">
             <Image
-              src="/images/sample-poster.jpeg"
-              alt="Product Builders Summit 2027 event poster"
+              src={EVENT.poster}
+              alt={EVENT.posterAlt}
               fill
               priority
               sizes="(min-width: 1024px) 420px, 100vw"
@@ -307,17 +241,14 @@ export default function EventPage() {
               ABOUT
             </div>
             <h2 className="mt-4 text-[40px] font-black leading-[1.05] tracking-[-0.035em] [text-wrap:balance]">
-              One day for the people who ship products.
+              Chennai&apos;s first-ever cruise party.
             </h2>
             <p className="mt-5 max-w-[52ch] text-lg leading-relaxed text-[#6B6B6B]">
-              A single-track day of talks, workshops and demos from founders,
-              designers and engineers building in India. Small rooms, real
-              case studies, and time to meet the people behind the products
-              you use.
+              {EVENT.description[0]} {EVENT.description[1]}
             </p>
           </div>
           <div className="flex min-w-0 flex-1 basis-[360px] flex-col">
-            {ABOUT_POINTS.map((point, i) => (
+            {HIGHLIGHTS.map((point, i) => (
               <div
                 key={point}
                 className="flex items-baseline gap-5 border-b border-[#EDE6E3] py-[22px] text-lg font-medium"
@@ -332,65 +263,34 @@ export default function EventPage() {
         </div>
       </section>
 
-      <section id="schedule">
+      <section id="tickets">
         <div className="mx-auto max-w-[880px] px-6 py-24">
           <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-            SCHEDULE
+            TICKETS
           </div>
-          <h2 className="mb-12 mt-4 text-[40px] font-black tracking-[-0.035em]">
-            The day
+          <h2 className="mb-10 mt-4 text-[40px] font-black tracking-[-0.035em]">
+            Pick your wave
           </h2>
-          <div className="relative">
-            <div className="absolute left-[96px] top-[10px] bottom-[10px] w-px bg-[#E5251B]" />
-            {SCHEDULE.map((item) => (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {PRICES.map((tier) => (
               <div
-                key={item.time}
-                className="grid grid-cols-[80px_32px_1fr] items-start pb-8"
+                key={tier.name}
+                style={{ opacity: tier.open ? 1 : 0.6 }}
+                className="rounded-xl border border-[#EDE6E3] p-7"
               >
-                <div className="pt-0.5 text-sm font-bold tabular-nums">
-                  {item.time}
+                <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
+                  {tier.name}
                 </div>
-                <div className="flex justify-center pt-[7px]">
-                  <span className="ml-px h-[9px] w-[9px] rounded-full bg-[#E5251B] shadow-[0_0_0_4px_white]" />
+                <div className="mt-4 flex justify-between text-base">
+                  <span className="text-[#6B6B6B]">Female</span>
+                  <span className="text-[26px] font-black tracking-[-0.03em]">{tier.female}</span>
                 </div>
-                <div>
-                  <div className="text-lg font-bold tracking-[-0.01em]">
-                    {item.title}
-                  </div>
-                  <div className="mt-1 text-[15px] text-[#6B6B6B]">
-                    {item.sub}
-                  </div>
+                <div className="mt-2 flex justify-between text-base">
+                  <span className="text-[#6B6B6B]">Male</span>
+                  <span className="text-[26px] font-black tracking-[-0.03em]">{tier.male}</span>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-t border-[#EDE6E3]">
-        <div className="mx-auto max-w-[1200px] px-6 py-24">
-          <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-            SPEAKERS
-          </div>
-          <h2 className="mb-12 mt-4 text-[40px] font-black tracking-[-0.035em]">
-            On stage
-          </h2>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 lg:grid-cols-5">
-            {SPEAKERS.map((speaker) => (
-              <div
-                key={speaker.name}
-                className="transition-transform duration-200 hover:-translate-y-1"
-              >
-                <PlaceholderImage
-                  label="Speaker photo"
-                  rounded="20px"
-                  className="aspect-square w-full"
-                />
-                <div className="mt-3.5 text-[17px] font-bold">
-                  {speaker.name}
-                </div>
-                <div className="mt-0.5 text-sm text-[#6B6B6B]">
-                  {speaker.role}
+                <div className="mt-4 text-sm text-[#6B6B6B]">
+                  {tier.open ? "Limited early-bird price" : "Announced soon"}
                 </div>
               </div>
             ))}
@@ -405,23 +305,25 @@ export default function EventPage() {
           </div>
           <div className="mt-6 flex flex-wrap overflow-hidden rounded-xl border border-[#EDE6E3] bg-white">
             <div className="relative min-h-[300px] flex-[2_1_420px]">
-              <PlaceholderImage
-                label="Map screenshot"
-                rounded="0px"
-                className="absolute inset-0 h-full w-full"
+              <Image
+                src="/images/location.png"
+                alt="Aerial view of a boat on the waters off Muthukadu"
+                fill
+                sizes="(min-width: 1024px) 760px, 100vw"
+                className="object-cover"
               />
             </div>
             <div className="flex flex-1 basis-[280px] flex-col justify-center gap-4 p-9">
               <div className="text-[26px] font-black leading-[1.1] tracking-[-0.025em]">
-                Bangalore International Centre
+                {EVENT.venueShort}
               </div>
               <div className="text-base leading-relaxed text-[#6B6B6B]">
-                7, 4th Main Rd, Stage 2, Domlur
+                East Coast Road (ECR)
                 <br />
-                Bengaluru, Karnataka 560071
+                Chennai, Tamil Nadu
               </div>
               <a
-                href="https://maps.google.com/?q=Bangalore+International+Centre"
+                href={EVENT.mapsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[15px] font-bold text-[#E5251B]"
@@ -472,7 +374,7 @@ export default function EventPage() {
 
       <footer className="border-t border-[#EDE6E3] px-6 pb-28 pt-6">
         <div className="mx-auto flex max-w-[1200px] flex-wrap items-center justify-between gap-3 text-[13px] text-[#6B6B6B]">
-          <span>© 2027 Heatwave. Event tickets made simple.</span>
+          <span>© 2026 Heatwave. Event tickets made simple.</span>
           <span className="flex gap-5">
             <Link href="/terms" className="text-[#6B6B6B] hover:text-[#141414]">
               Terms
@@ -498,12 +400,12 @@ export default function EventPage() {
                 FROM
               </div>
               <div className="text-xl font-black tracking-[-0.02em]">
-                ₹999
+                ₹899
               </div>
             </div>
             <div className="text-sm text-[#6B6B6B]">
-              <span className="font-bold text-[#E5251B]">{SEATS_LEFT}</span>{" "}
-              seats left · Sat, 13 Feb
+              <span className="font-bold text-[#E5251B]">Early Birds</span>{" "}
+              · Sat, 12 Dec
             </div>
           </div>
           <button

@@ -1,8 +1,9 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { EVENT } from "@/lib/event";
 import RegisterForm, { type ExistingRegistration } from "./RegisterForm";
 
-const EVENT_SLUG = "product-builders-summit-2027";
+const EVENT_SLUG = EVENT.slug;
 
 // One registration per account. Checked on the server so an already-registered
 // user gets the "already registered" screen in the first response, instead of

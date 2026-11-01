@@ -214,7 +214,7 @@ export default function AuthModal({
           </h2>
           <p className="mt-1.5 text-sm text-[#6B6B6B]">
             {mode === "login"
-              ? "Log in to register for Product Builders Summit 2027."
+              ? "Log in to register for Caseano."
               : "Sign up to register and keep your tickets in one place."}
           </p>
 
