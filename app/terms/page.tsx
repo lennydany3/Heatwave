@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LegalPage, { Section } from "@/components/legal/LegalPage";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Terms & Conditions — Heatwave",
@@ -62,10 +63,10 @@ export default function TermsPage() {
         </p>
         <p>
           If you&apos;re unable to attend, contact{" "}
-          <a href="mailto:support@heatwave.in" className="font-bold text-[#141414] underline">
-            support@heatwave.in
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-bold text-[#141414] underline">
+            {SUPPORT_EMAIL}
           </a>{" "}
-          — ticket transfers to another attendee may be possible at our discretion.
+          or call {SUPPORT_PHONE} — ticket transfers to another attendee may be possible at our discretion.
         </p>
       </Section>
 
@@ -116,10 +117,10 @@ export default function TermsPage() {
       <Section heading="12. Contact us">
         <p>
           Questions about these terms? Email{" "}
-          <a href="mailto:support@heatwave.in" className="font-bold text-[#141414] underline">
-            support@heatwave.in
-          </a>
-          .
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-bold text-[#141414] underline">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          or call {SUPPORT_PHONE}.
         </p>
       </Section>
     </LegalPage>

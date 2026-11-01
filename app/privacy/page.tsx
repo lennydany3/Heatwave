@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import LegalPage, { Section } from "@/components/legal/LegalPage";
+import { SUPPORT_EMAIL, SUPPORT_PHONE } from "@/lib/support";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — Heatwave",
@@ -106,10 +107,10 @@ export default function PrivacyPage() {
         </ul>
         <p>
           To make a request, email us at{" "}
-          <a href="mailto:privacy@heatwave.in" className="font-bold text-[#141414] underline">
-            privacy@heatwave.in
-          </a>
-          . Note that we may need to keep some records (such as past transactions) where we&apos;re
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-bold text-[#141414] underline">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          or call {SUPPORT_PHONE}. Note that we may need to keep some records (such as past transactions) where we&apos;re
           legally required to.
         </p>
       </Section>
@@ -141,10 +142,10 @@ export default function PrivacyPage() {
       <Section heading="11. Contact us">
         <p>
           Questions about this policy? Email{" "}
-          <a href="mailto:privacy@heatwave.in" className="font-bold text-[#141414] underline">
-            privacy@heatwave.in
-          </a>
-          . See also our{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="font-bold text-[#141414] underline">
+            {SUPPORT_EMAIL}
+          </a>{" "}
+          or call {SUPPORT_PHONE}. See also our{" "}
           <Link href="/terms" className="font-bold text-[#141414] underline">
             Terms &amp; Conditions
           </Link>

@@ -5,10 +5,21 @@ import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import SupportModal from "@/components/SupportModal";
 import { createClient } from "@/utils/supabase/client";
 
-type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in";
+type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in" | "Verifying" | "Payment failed";
 type TabId = "upcoming" | "past" | "cancelled";
+
+type WaitlistEntry = {
+  id: string;
+  status: "waiting" | "invited";
+  position: number | null;
+  eventName: string | null;
+  venue: string | null;
+  startsAt: string | null;
+  tierName: string | null;
+};
 
 type Ticket = {
   id: string;
@@ -21,8 +32,12 @@ type Ticket = {
   price: number;
   bid: string;
   status: TicketStatus;
+  note: string | null;
+  upiTxnId: string | null;
   tab: TabId;
   startsAt: string | null;
+  /** True when the payment was unsuccessful (not declined), so the customer can register again. */
+  canRetry?: boolean;
 };
 
 type TicketRow = {
@@ -30,7 +45,13 @@ type TicketRow = {
   ticket_code: string;
   status: "valid" | "checked_in" | "cancelled";
   created_at: string;
-  registrations: { amount: number; ticket_tiers: { name: string } | null } | null;
+  registrations: {
+    amount: number;
+    status: "pending" | "paid" | "failed" | "cancelled";
+    verification_note: string | null;
+    upi_txn_id: string | null;
+    ticket_tiers: { name: string } | null;
+  } | null;
   events: { name: string; venue: string | null; starts_at: string | null } | null;
 };
 
@@ -38,7 +59,34 @@ const BADGE: Record<TicketStatus, { bg: string; fg: string; dot: string }> = {
   Confirmed: { bg: "#EEF4EF", fg: "#2F6B45", dot: "#3F8A5A" },
   Cancelled: { bg: "#FDECEA", fg: "#B71C14", dot: "#E5251B" },
   "Checked-in": { bg: "#141414", fg: "#FFFFFF", dot: "#FFFFFF" },
+  Verifying: { bg: "#FFF6E5", fg: "#8A5A00", dot: "#D99A1E" },
+  "Payment failed": { bg: "#FDECEA", fg: "#B71C14", dot: "#E5251B" },
 };
+
+function PaymentNotice({ t, className = "" }: { t: Ticket; className?: string }) {
+  if (t.status === "Verifying") {
+    return (
+      <div className={`rounded-xl bg-[#FFF6E5] px-4 py-3 text-sm leading-relaxed text-[#8A5A00] ${className}`}>
+        <span className="font-bold">Payment verification pending.</span>{" "}
+        {t.note || "We're checking your UPI payment. Your QR works at the entrance once it's verified."}
+      </div>
+    );
+  }
+  if (t.status === "Payment failed") {
+    return (
+      <div className={`rounded-xl bg-[#FDECEA] px-4 py-3 text-sm leading-relaxed text-[#B71C14] ${className}`}>
+        <span className="font-bold">
+          {t.canRetry ? "Payment wasn't successful." : "Registration couldn't be approved."}
+        </span>{" "}
+        {t.note ||
+          (t.canRetry
+            ? "We couldn't find your payment. You can register again with a fresh payment."
+            : "Please contact support with your UPI transaction ID.")}
+      </div>
+    );
+  }
+  return null;
+}
 
 const fmt = (n: number) => (n ? "₹" + n.toLocaleString("en-IN") : "Free");
 
@@ -49,6 +97,63 @@ function relativeWhen(iso: string | null): string {
   if (days === 1) return "tomorrow";
   return `in ${days} days`;
 }
+
+// The QR area of a ticket, by state: only a verified ticket shows a scannable QR.
+// A ticket still being verified shows it locked; a failed one shows no QR at all.
+function TicketStub({ t, size }: { t: Ticket; size: number }) {
+  const box = size + 24;
+  if (t.status === "Payment failed") {
+    return (
+      <div
+        style={{ width: box, height: box }}
+        className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#F3C9C5] bg-[#FFF8F7] p-3 text-center"
+      >
+        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FDECEA]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M6 6l12 12M18 6L6 18" stroke="#B71C14" strokeWidth="2.6" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span className="text-sm font-black text-[#B71C14]">Ticket not valid</span>
+        <span className="text-[11px] leading-snug text-[#9A6A66]">No QR is issued for a failed payment</span>
+      </div>
+    );
+  }
+  const locked = t.status === "Verifying";
+  return (
+    <div
+      style={{ width: box, height: box }}
+      className="relative flex items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3"
+    >
+      <div style={locked ? { filter: "blur(5px)", opacity: 0.45 } : undefined}>
+        <QRCodeSVG value={t.bid} size={size} />
+      </div>
+      {locked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-3 text-center">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFF6E5]">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="5" y="11" width="14" height="9" rx="2" stroke="#8A5A00" strokeWidth="2" />
+              <path d="M8 11V8a4 4 0 018 0v3" stroke="#8A5A00" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
+          <span className="text-xs font-black text-[#8A5A00]">Activates once verified</span>
+        </div>
+      )}
+      {t.status === "Checked-in" && (
+        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80 text-sm font-black text-[#141414]">
+          Already used
+        </div>
+      )}
+    </div>
+  );
+}
+
+const ACCENT: Record<TicketStatus, string> = {
+  Confirmed: "#E5251B",
+  "Checked-in": "#141414",
+  Cancelled: "#B5ADA9",
+  Verifying: "#D99A1E",
+  "Payment failed": "#B71C14",
+};
 
 function PlaceholderThumb({ className = "" }: { className?: string }) {
   return (
@@ -110,6 +215,10 @@ export default function DashboardPage() {
 
   const [tab, setTab] = useState<TabId>("upcoming");
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
+  const [supportFor, setSupportFor] = useState<string | null>(null);
+  // The admin's outcome per ticket code, to tell "try again" from "contact support".
+  const [retryable, setRetryable] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -125,7 +234,7 @@ export default function DashboardPage() {
       const { data } = await supabase
         .from("tickets")
         .select(
-          "id, ticket_code, status, created_at, registrations(amount, ticket_tiers(name)), events(name, venue, starts_at)"
+          "id, ticket_code, status, created_at, registrations(amount, status, verification_note, upi_txn_id, ticket_tiers(name)), events(name, venue, starts_at)"
         )
         .order("created_at", { ascending: false })
         .returns<TicketRow[]>();
@@ -135,12 +244,17 @@ export default function DashboardPage() {
       const mapped: Ticket[] = (data ?? []).map((row) => {
         const startsAt = row.events?.starts_at ?? null;
         const isPast = startsAt ? new Date(startsAt).getTime() < Date.now() : false;
+        const payment = row.registrations?.status;
         const status: TicketStatus =
-          row.status === "cancelled"
+          row.status === "cancelled" || payment === "cancelled"
             ? "Cancelled"
             : row.status === "checked_in"
               ? "Checked-in"
-              : "Confirmed";
+              : payment === "failed"
+                ? "Payment failed"
+                : payment === "paid"
+                  ? "Confirmed"
+                  : "Verifying";
         return {
           id: row.id,
           title: row.events?.name ?? "Event",
@@ -164,6 +278,8 @@ export default function DashboardPage() {
           price: row.registrations?.amount ?? 0,
           bid: row.ticket_code,
           status,
+          note: row.registrations?.verification_note ?? null,
+          upiTxnId: row.registrations?.upi_txn_id ?? null,
           tab: status === "Cancelled" ? "cancelled" : isPast ? "past" : "upcoming",
           startsAt,
         };
@@ -174,6 +290,41 @@ export default function DashboardPage() {
     }
 
     load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/waitlist/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.entries) setWaitlist(d.entries);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/registrations/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.registrations) return;
+        setRetryable(
+          Object.fromEntries(
+            (d.registrations as { ticketCode: string | null; canRetry: boolean }[])
+              .filter((r) => r.ticketCode)
+              .map((r) => [r.ticketCode as string, r.canRetry])
+          )
+        );
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -194,12 +345,16 @@ export default function DashboardPage() {
     showToast("Calendar file downloaded");
   }
 
-  const inTab = useMemo(() => tickets.filter((t) => t.tab === tab), [tickets, tab]);
+  const view = useMemo(
+    () => tickets.map((t) => ({ ...t, canRetry: !!retryable[t.bid] })),
+    [tickets, retryable]
+  );
+  const inTab = useMemo(() => view.filter((t) => t.tab === tab), [view, tab]);
   const hl = tab === "upcoming" ? inTab[0] : undefined;
   const rest = hl ? inTab.slice(1) : inTab;
-  const cur = open != null ? tickets.find((t) => t.id === open) ?? null : null;
+  const cur = open != null ? view.find((t) => t.id === open) ?? null : null;
   const counts = { upcoming: 0, past: 0, cancelled: 0 };
-  tickets.forEach((t) => counts[t.tab]++);
+  view.forEach((t) => counts[t.tab]++);
 
   return (
     <div
@@ -274,6 +429,61 @@ export default function DashboardPage() {
           </Link>
         </div>
 
+        {waitlist.map((w) => {
+          const invited = w.status === "invited";
+          return (
+            <div
+              key={w.id}
+              className="mt-10 flex animate-[hwUp_0.5s_0.05s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white sm:flex-row"
+            >
+              <div className="w-full flex-none sm:w-1.5" style={{ background: invited ? "#3F8A5A" : "#D99A1E" }} />
+              <div className="min-w-0 flex-1 p-6 sm:p-8">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    background: invited ? "#EEF4EF" : "#FFF6E5",
+                    color: invited ? "#2F6B45" : "#8A5A00",
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: invited ? "#3F8A5A" : "#D99A1E" }}
+                  />
+                  {invited ? "Seat held for you" : "On the waitlist"}
+                </span>
+                <div className="mt-3 text-[26px] font-black leading-[1.1] tracking-[-0.03em]">
+                  {w.eventName ?? "Event"}
+                </div>
+                <div className="mt-1 text-sm text-[#6B6B6B]">
+                  {w.tierName ?? "Ticket"}
+                  {w.venue ? ` · ${w.venue}` : ""}
+                </div>
+                <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-[#6B6B6B]">
+                  {invited
+                    ? "Good news — a seat opened up and it's being held for you. Complete your registration and payment to lock it in."
+                    : `You're in line${w.position ? ` at #${w.position}` : ""}. Hang tight — good things come to those who wait. When a seat frees up we'll invite you in order, and it'll show up right here.`}
+                </p>
+                {invited && (
+                  <Link
+                    href="/events/registations"
+                    className="mt-5 inline-flex h-[46px] items-center rounded-full bg-[#E5251B] px-6 text-[15px] font-bold text-white hover:bg-[#B71C14]"
+                  >
+                    Complete registration →
+                  </Link>
+                )}
+              </div>
+              {!invited && w.position && (
+                <div className="flex flex-none flex-col items-center justify-center border-t border-[#EDE6E3] bg-[#FAF7F5] px-9 py-6 sm:border-l sm:border-t-0">
+                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">YOUR PLACE</div>
+                  <div className="mt-1 text-[48px] font-black leading-none tracking-[-0.04em] tabular-nums">
+                    #{w.position}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
         {loading && (
           <div className="mt-10 h-[280px] animate-[hwPulse_1.4s_ease_infinite] rounded-xl border border-[#EDE6E3] bg-[#FAF7F5]" />
         )}
@@ -285,7 +495,7 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3.5 flex animate-[hwUp_0.5s_0.1s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white lg:flex-row">
               <div className="flex min-w-0 flex-1">
-                <div className="w-1.5 flex-none bg-[#E5251B]" />
+                <div className="w-1.5 flex-none" style={{ background: ACCENT[hl.status] }} />
                 <div className="min-w-0 flex-1 p-6 sm:p-9">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <span
@@ -318,40 +528,69 @@ export default function DashboardPage() {
                       <div className="mt-1 text-base font-bold">{hl.type}</div>
                     </div>
                   </div>
+                  <PaymentNotice t={hl} className="mt-6" />
                   <div className="mt-8 flex flex-wrap gap-2.5">
                     <button
                       onClick={() => setOpen(hl.id)}
                       className="inline-flex h-12 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6.5 text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
                     >
-                      View ticket
+                      {hl.status === "Payment failed" ? "View details" : "View ticket"}
                     </button>
-                    <button
-                      onClick={() => downloadIcs(hl)}
-                      className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                    >
-                      Add to calendar
-                    </button>
-                    <button
-                      onClick={() =>
-                        window.open(
-                          "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
-                          "_blank"
-                        )
-                      }
-                      className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                    >
-                      Get directions
-                    </button>
+                    {hl.status === "Payment failed" ? (
+                      hl.canRetry ? (
+                        <Link
+                          href="/events/registations"
+                          className="inline-flex h-12 items-center rounded-full border border-[#141414] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Register again
+                        </Link>
+                      ) : (
+                        <button
+                          onClick={() => setSupportFor(hl.bid)}
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Contact support
+                        </button>
+                      )
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => downloadIcs(hl)}
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Add to calendar
+                        </button>
+                        <button
+                          onClick={() =>
+                            window.open(
+                              "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
+                              "_blank"
+                            )
+                          }
+                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
+                        >
+                          Get directions
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
               <div className="relative flex flex-none flex-col items-center justify-center gap-3 border-t border-dashed border-[#E0D6D2] bg-[#FAF7F5] p-7 lg:w-[260px] lg:border-l lg:border-t-0">
                 <span className="absolute -left-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
                 <span className="absolute -right-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white lg:-bottom-3 lg:-left-3 lg:right-auto lg:top-auto" />
-                <div className="flex h-40 w-40 items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3">
-                  <QRCodeSVG value={hl.bid} size={136} />
+                <TicketStub t={hl} size={136} />
+                <div className="text-center text-xs text-[#6B6B6B]">
+                  {hl.status === "Confirmed"
+                    ? "Scan at entry"
+                    : hl.status === "Verifying"
+                      ? "Pending payment verification"
+                      : hl.status === "Payment failed"
+                        ? "Payment failed"
+                        : hl.status === "Checked-in"
+                          ? "Checked in"
+                          : "Cancelled"}
                 </div>
-                <div className="text-center text-xs text-[#6B6B6B]">Scan at entry</div>
               </div>
             </div>
           </>
@@ -497,9 +736,7 @@ export default function DashboardPage() {
             </div>
             <div className="flex flex-wrap">
               <div className="flex flex-1 basis-[280px] flex-col items-center gap-4 border-r border-[#EDE6E3] bg-[#FAF7F5] p-7">
-                <div className="flex aspect-square w-full max-w-[240px] items-center justify-center rounded-xl border border-[#EDE6E3] bg-white p-4">
-                  <QRCodeSVG value={cur.bid} size={192} />
-                </div>
+                <TicketStub t={cur} size={192} />
                 <div className="text-center">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">BOOKING ID</div>
                   <div className="mt-1 text-lg font-black tracking-[0.02em] tabular-nums">{cur.bid}</div>
@@ -520,6 +757,7 @@ export default function DashboardPage() {
                     {cur.venue}
                   </div>
                 </div>
+                <PaymentNotice t={cur} />
                 <div className="flex flex-col gap-2.5 rounded-xl border border-[#EDE6E3] p-4.5 text-[15px]">
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">PAYMENT</div>
                   <div className="flex justify-between">
@@ -527,9 +765,14 @@ export default function DashboardPage() {
                     <span>{fmt(cur.price)}</span>
                   </div>
                   <div className="flex justify-between border-t border-[#EDE6E3] pt-2.5 font-black">
-                    <span>Paid via Razorpay</span>
+                    <span>Paid via UPI</span>
                     <span>{fmt(cur.price)}</span>
                   </div>
+                  {cur.upiTxnId && (
+                    <div className="text-[13px] tabular-nums text-[#6B6B6B]">
+                      Transaction ID {cur.upiTxnId}
+                    </div>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   <button
@@ -555,6 +798,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      <SupportModal open={supportFor !== null} onClose={() => setSupportFor(null)} bookingId={supportFor} />
 
       {toastMsg && (
         <div className="fixed bottom-[92px] left-1/2 z-[60] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white lg:bottom-8">

@@ -15,8 +15,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Heatwave",
-  description: "Event tickets made simple.",
+  title: "Caseano · Heatwave × Moxie Club",
+  description:
+    "Chennai's first-ever cruise party. Dec 12 at Muthukadu Boat House, ECR. Get your tickets on Heatwave.",
+  openGraph: {
+    title: "Caseano · Heatwave × Moxie Club",
+    description: "Chennai's first-ever cruise party. Dec 12 at Muthukadu Boat House, ECR.",
+    images: ["/images/caseano.png"],
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

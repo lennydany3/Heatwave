@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { BADGE, fmt } from "../_lib/data";
-import { createClient } from "@/utils/supabase/client";
 
 type BookingStatus = "Confirmed" | "Pending" | "Checked-in" | "Cancelled";
 type Range = "7D" | "30D" | "90D";
@@ -59,30 +58,21 @@ export default function AdminDashboardPage() {
   const [page, setPage] = useState(0);
   const [rows, setRows] = useState<RegistrationRow[]>([]);
   const [eventCounts, setEventCounts] = useState({ total: 0, active: 0 });
+  const [masks, setMasks] = useState<string[]>([]);
+  const money = (n: number) => (masks.includes("revenue") ? "₹ ••••" : fmt(n));
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const supabase = createClient();
-      const [{ data: regs }, { data: events }] = await Promise.all([
-        supabase
-          .from("registrations")
-          .select(
-            "id, full_name, amount, status, created_at, events(name), ticket_tiers(name), tickets(status, checked_in_at)"
-          )
-          .order("created_at", { ascending: false })
-          .returns<RegistrationRow[]>(),
-        supabase.from("events").select("id, starts_at"),
-      ]);
+      // Read through the API so masked fields are blanked on the server.
+      const res = await fetch("/api/admin/overview", { cache: "no-store" });
+      const data = await res.json().catch(() => null);
       if (cancelled) return;
-      setRows(regs ?? []);
-      const now = Date.now();
-      setEventCounts({
-        total: events?.length ?? 0,
-        active:
-          events?.filter((e) => !e.starts_at || new Date(e.starts_at).getTime() > now).length ??
-          0,
-      });
+      if (res.ok && data) {
+        setRows(data.rows);
+        setEventCounts(data.eventCounts);
+        setMasks(data.masks ?? []);
+      }
       setLoading(false);
     }
     load();
@@ -195,7 +185,7 @@ export default function AdminDashboardPage() {
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "TOTAL REVENUE", value: fmt(totalRevenue), note: `${paidCount} bookings` },
+          { label: "TOTAL REVENUE", value: money(totalRevenue), note: `${paidCount} bookings` },
           { label: "TICKETS SOLD", value: String(paidCount), note: `${bookings.length} total registrations` },
           { label: "ACTIVE EVENTS", value: String(eventCounts.active), note: `${eventCounts.total} total` },
           {
@@ -220,6 +210,11 @@ export default function AdminDashboardPage() {
       </div>
 
       <div className="mt-5 flex flex-wrap items-stretch gap-5">
+        {masks.includes("chart") ? (
+          <div className="flex min-w-0 flex-[2_1_520px] items-center justify-center rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6 text-sm font-bold text-[#6B6B6B]">
+            Bookings chart hidden for your role
+          </div>
+        ) : (
         <div className="min-w-0 flex-[2_1_520px] rounded-xl border border-[#EDE6E3] p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -273,6 +268,7 @@ export default function AdminDashboardPage() {
             <span>Today</span>
           </div>
         </div>
+        )}
         <div className="min-w-0 flex-[1_1_300px] rounded-xl border border-[#EDE6E3] p-6">
           <div className="text-[17px] font-bold">Top events by sales</div>
           {topEvents.length === 0 && (
@@ -283,13 +279,13 @@ export default function AdminDashboardPage() {
               <div key={name}>
                 <div className="flex justify-between gap-3 text-sm">
                   <span className="font-bold">{name}</span>
-                  <span className="tabular-nums">{fmt(rev)}</span>
+                  <span className="tabular-nums">{money(rev)}</span>
                 </div>
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#F3EEEB]">
                   <div
                     className="h-full rounded-full transition-[width] duration-500 ease-out"
                     style={{
-                      width: (rev / topEvents[0][1]) * 100 + "%",
+                      width: (topEvents[0][1] ? (rev / topEvents[0][1]) * 100 : 0) + "%",
                       background: i === 0 ? "#E5251B" : "#141414",
                     }}
                   />
@@ -360,7 +356,7 @@ export default function AdminDashboardPage() {
                   <div className="min-w-0 truncate font-bold">{r.name}</div>
                   <div className="min-w-0 truncate">{r.event}</div>
                   <div className="text-[#6B6B6B]">{r.type}</div>
-                  <div className="text-right font-bold tabular-nums">{fmt(r.amount)}</div>
+                  <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
                   <div>
                     <span
                       className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold"
@@ -396,7 +392,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex justify-between text-[13px] text-[#6B6B6B]">
                   <span>{r.date}</span>
-                  <span className="text-sm font-bold text-[#141414]">{fmt(r.amount)}</span>
+                  <span className="text-sm font-bold text-[#141414]">{money(r.amount)}</span>
                 </div>
               </div>
             );

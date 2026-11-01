@@ -1,21 +1,10 @@
-export type AdminPageKey =
-  | "overview"
-  | "events"
-  | "bookings"
-  | "attendees"
-  | "checkin"
-  | "payments"
-  | "settings";
+import { PAGES, type PageKey } from "@/lib/permissions";
 
-export const ADMIN_NAV: { key: AdminPageKey; label: string; href: string }[] = [
-  { key: "overview", label: "Overview", href: "/admin/dashboard" },
-  { key: "events", label: "Events", href: "/admin/events" },
-  { key: "bookings", label: "Bookings", href: "/admin#bookings" },
-  { key: "attendees", label: "Attendees", href: "/admin/check-in" },
-  { key: "checkin", label: "Check-in", href: "/admin/check-in" },
-  { key: "payments", label: "Payments", href: "/admin/payments" },
-  { key: "settings", label: "Settings", href: "#" },
-];
+export type AdminPageKey = PageKey;
+
+export const ADMIN_NAV: { key: AdminPageKey; label: string; href: string }[] = PAGES.map(
+  ({ key, label, href }) => ({ key, label, href })
+);
 
 export const EVENT_NAMES = [
   "Bay Beats Festival",

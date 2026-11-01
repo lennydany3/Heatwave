@@ -25,11 +25,14 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Do not run any code between createServerClient and getUser(),
+  // Do not run any code between createServerClient and getClaims(),
   // a stray Supabase error can silently drop the refreshed session.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims() verifies the JWT locally (signing keys are cached), so unlike
+  // getUser() it doesn't make a network round trip to Supabase Auth on every
+  // request. It still refreshes the session when the token has expired.
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  const user = claims?.sub ? { id: claims.sub, email: claims.email as string | undefined } : null;
 
   return { supabaseResponse, user, supabase };
 }
