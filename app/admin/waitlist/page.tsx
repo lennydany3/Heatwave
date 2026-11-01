@@ -49,6 +49,11 @@ export default function AdminWaitlistPage() {
   const [noSeats, setNoSeats] = useState<{ entry: Entry; tier: TierSeats } | null>(null);
   const [newLimit, setNewLimit] = useState("");
   const [raising, setRaising] = useState(false);
+  // Permanent delete of a waitlist record, behind a typed confirmation.
+  const [toDelete, setToDelete] = useState<Entry | null>(null);
+  const [confirmText, setConfirmText] = useState("");
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -102,6 +107,32 @@ export default function AdminWaitlistPage() {
       return;
     }
     showToast(msg);
+    await load();
+  }
+
+  function askDelete(entry: Entry) {
+    setToDelete(entry);
+    setConfirmText("");
+    setDeleteError("");
+  }
+
+  async function confirmDelete() {
+    if (!toDelete || confirmText !== "DELETE") return;
+    setDeleting(true);
+    setDeleteError("");
+    const res = await fetch("/api/admin/waitlist", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: toDelete.id }),
+    });
+    const data = await res.json().catch(() => null);
+    setDeleting(false);
+    if (!res.ok) {
+      setDeleteError(data?.error ?? "Couldn't delete — try again");
+      return;
+    }
+    showToast(`${toDelete.fullName} was permanently deleted from the waitlist`);
+    setToDelete(null);
     await load();
   }
 
@@ -266,15 +297,13 @@ export default function AdminWaitlistPage() {
                       Undo invite
                     </button>
                   )}
-                  {e.status !== "registered" && (
-                    <button
-                      onClick={() => act(e, "DELETE", undefined, "Removed from the waitlist")}
-                      disabled={disabled}
-                      className="h-9 rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#FDECEA] disabled:opacity-35"
-                    >
-                      Remove
-                    </button>
-                  )}
+                  <button
+                    onClick={() => askDelete(e)}
+                    disabled={disabled}
+                    className="h-9 rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#B71C14] hover:text-white disabled:opacity-35"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             );
@@ -289,6 +318,86 @@ export default function AdminWaitlistPage() {
           </div>
         )}
       </section>
+
+      {toDelete && (
+        <div
+          onClick={() => !deleting && setToDelete(null)}
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-[#141414]/60 p-4"
+        >
+          <div
+            onClick={(ev) => ev.stopPropagation()}
+            role="alertdialog"
+            aria-labelledby="wl-del-title"
+            className="w-full max-w-[480px] animate-[hwUp_0.25s_ease_both] overflow-hidden rounded-xl bg-white"
+          >
+            <div className="flex items-center gap-3 bg-[#B71C14] px-6 py-4 text-white">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M12 3l10 18H2L12 3z" stroke="#fff" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M12 10v5M12 18v.01" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              <div id="wl-del-title" className="text-[17px] font-black tracking-[-0.01em]">
+                Danger: permanent deletion
+              </div>
+            </div>
+            <div className="px-6 py-5">
+              <p className="m-0 text-[15px] leading-relaxed">
+                You are about to permanently delete{" "}
+                <span className="font-bold">{toDelete.fullName}</span> ({toDelete.email}) from the
+                waitlist. This <span className="font-bold text-[#B71C14]">cannot be undone</span>.
+              </p>
+              <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-[#6B6B6B]">
+                <li>Their waitlist details and queue position are erased</li>
+                {toDelete.status === "invited" && (
+                  <li>
+                    Their held seat is released — they can no longer register through their invite
+                  </li>
+                )}
+                {toDelete.status === "waiting" && (
+                  <li>
+                    They will no longer see the waitlist card in My Tickets, and everyone behind
+                    them moves up one place
+                  </li>
+                )}
+                {toDelete.status === "registered" && (
+                  <li>
+                    Only this waitlist record is deleted — their registration and ticket are not
+                    touched (delete those from Customers)
+                  </li>
+                )}
+              </ul>
+              <label htmlFor="wl-del-confirm" className="mt-5 block text-sm font-bold">
+                Type <span className="rounded bg-[#FDECEA] px-1.5 py-0.5 text-[#B71C14]">DELETE</span>{" "}
+                to confirm
+              </label>
+              <input
+                id="wl-del-confirm"
+                value={confirmText}
+                onChange={(ev) => setConfirmText(ev.target.value)}
+                autoComplete="off"
+                placeholder="DELETE"
+                className="mt-2 h-12 w-full rounded-xl border border-[#EDE6E3] px-4 text-base outline-none focus:border-[#B71C14] focus:shadow-[0_0_0_3px_rgba(183,28,20,.15)]"
+              />
+              {deleteError && <div className="mt-2 text-[13px] text-[#C8372D]">{deleteError}</div>}
+              <div className="mt-6 flex justify-end gap-2.5">
+                <button
+                  onClick={() => setToDelete(null)}
+                  disabled={deleting}
+                  className="h-11 rounded-full border border-[#EDE6E3] px-5 text-sm font-bold disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={confirmText !== "DELETE" || deleting}
+                  className="h-11 min-w-[150px] rounded-full bg-[#B71C14] px-5 text-sm font-bold text-white transition-opacity disabled:opacity-35"
+                >
+                  {deleting ? "Deleting…" : "Delete permanently"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {noSeats && (
         <div
