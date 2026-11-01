@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { EVENT } from "@/lib/event";
+import type { EventData } from "@/lib/eventData";
 import { createClient } from "@/utils/supabase/client";
 
 type FieldKey = "fullName" | "email" | "mobile" | "instagram" | "age";
@@ -103,6 +104,15 @@ const MASK: Partial<Record<FieldKey, (v: string) => string>> = {
 };
 
 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+// Prefer a tier that's open for registration; otherwise a full / closed one
+// (which leads to the waitlist).
+function pickTier(list: TicketTier[], avail: Record<string, TierAvailability>): string | null {
+  const t =
+    list.find((x) => x.status === "open" && !avail[x.id]?.registrationClosed) ??
+    list.find((x) => x.status !== "coming_soon");
+  return t?.id ?? null;
+}
 
 async function fetchAvailability(): Promise<Record<string, TierAvailability>> {
   try {
@@ -223,9 +233,13 @@ function Field({
 export default function RegisterForm({
   initialExisting,
   initialWaitlist,
+  initialData,
 }: {
   initialExisting: ExistingRegistration | null;
   initialWaitlist: InitialWaitlist | null;
+  // Event, tiers and seat availability, loaded on the server. Null falls back to
+  // fetching them in the browser.
+  initialData: EventData | null;
 }) {
   const { user } = useAuth();
 
@@ -236,11 +250,15 @@ export default function RegisterForm({
   const [gender, setGender] = useState<Gender | "">("");
   const [genderTouched, setGenderTouched] = useState(false);
 
-  const [event, setEvent] = useState<EventInfo | null>(null);
-  const [tiers, setTiers] = useState<TicketTier[]>([]);
-  const [tiersLoading, setTiersLoading] = useState(true);
-  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
-  const [availability, setAvailability] = useState<Record<string, TierAvailability>>({});
+  const [event, setEvent] = useState<EventInfo | null>(initialData?.event ?? null);
+  const [tiers, setTiers] = useState<TicketTier[]>(initialData?.tiers ?? []);
+  const [tiersLoading, setTiersLoading] = useState(!initialData);
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(
+    initialData ? pickTier(initialData.tiers, initialData.availability) : null
+  );
+  const [availability, setAvailability] = useState<Record<string, TierAvailability>>(
+    initialData?.availability ?? {}
+  );
   const [joining, setJoining] = useState(false);
   const [waitlistError, setWaitlistError] = useState("");
   // Already queued (from the server) or just joined: show the waiting screen
@@ -273,6 +291,7 @@ export default function RegisterForm({
   }, [user]);
 
   useEffect(() => {
+    if (initialData) return;
     let cancelled = false;
     async function load() {
       const supabase = createClient();
@@ -298,18 +317,16 @@ export default function RegisterForm({
       const list = tierRows ?? [];
       setTiers(list);
       setAvailability(avail);
-      // Prefer a tier that's open for registration; otherwise a full / closed one
-      // (which leads to the waitlist).
-      const pick =
-        list.find((t) => t.status === "open" && !avail[t.id]?.registrationClosed) ??
-        list.find((t) => t.status !== "coming_soon");
-      if (pick) setSelectedTierId(pick.id);
+      const pick = pickTier(list, avail);
+      if (pick) setSelectedTierId(pick);
       setTiersLoading(false);
     }
     load();
     return () => {
       cancelled = true;
     };
+  // Server-provided props are fixed for the life of the page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

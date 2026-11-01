@@ -23,12 +23,22 @@ const isMissing = (code?: string) =>
   code === "42703" || code === "PGRST204" || code === "42P01" || code === "PGRST205";
 
 export async function eventSeats(admin: SupabaseClient, eventId: string): Promise<TierSeats[]> {
+  // Independent queries, run together.
+  const [withLimit, regsRes, wl] = await Promise.all([
+    admin
+      .from("ticket_tiers")
+      .select("id, status, seat_limit")
+      .eq("event_id", eventId)
+      .order("sort_order"),
+    admin
+      .from("registrations")
+      .select("ticket_tier_id, status")
+      .eq("event_id", eventId)
+      .in("status", ["pending", "paid"]),
+    admin.from("waitlist").select("ticket_tier_id, status").eq("event_id", eventId),
+  ]);
+
   let tiers: { id: string; status: TierSeats["status"]; seat_limit?: number | null }[] = [];
-  const withLimit = await admin
-    .from("ticket_tiers")
-    .select("id, status, seat_limit")
-    .eq("event_id", eventId)
-    .order("sort_order");
   if (withLimit.error && isMissing(withLimit.error.code)) {
     const plain = await admin
       .from("ticket_tiers")
@@ -39,14 +49,7 @@ export async function eventSeats(admin: SupabaseClient, eventId: string): Promis
   } else {
     tiers = withLimit.data ?? [];
   }
-
-  const { data: regs } = await admin
-    .from("registrations")
-    .select("ticket_tier_id, status")
-    .eq("event_id", eventId)
-    .in("status", ["pending", "paid"]);
-
-  const wl = await admin.from("waitlist").select("ticket_tier_id, status").eq("event_id", eventId);
+  const regs = regsRes.data;
   const waitlist = wl.error ? [] : wl.data ?? [];
 
   return tiers.map((t) => {

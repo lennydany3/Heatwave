@@ -83,12 +83,22 @@ const FAQS = [
   },
 ];
 
-export default function EventPage() {
+export default function EventPage({
+  initialTiers,
+  initialClosed,
+}: {
+  initialTiers?: Tier[];
+  initialClosed?: Record<string, boolean>;
+}) {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
-  const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
+  const [tiers, setTiers] = useState<Tier[]>(
+    initialTiers && initialTiers.length > 0 ? initialTiers : FALLBACK_TIERS
+  );
   // Tiers that are full or manually closed: registration is replaced by the waitlist.
-  const [closedIds, setClosedIds] = useState<Record<string, boolean>>({});
+  const [closedIds, setClosedIds] = useState<Record<string, boolean>>(
+    initialClosed ?? {}
+  );
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
@@ -104,6 +114,8 @@ export default function EventPage() {
   }, []);
 
   useEffect(() => {
+    // The server already supplied the tiers; only fetch in the browser as a fallback.
+    if (initialTiers) return;
     let cancelled = false;
     async function loadTiers() {
       const supabase = createClient();
@@ -135,6 +147,8 @@ export default function EventPage() {
     return () => {
       cancelled = true;
     };
+  // Server-provided props are fixed for the life of the page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
