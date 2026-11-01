@@ -8,7 +8,7 @@ type Method = "otp" | "password";
 type Step = "form" | "code";
 
 const btn =
-  "inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left disabled:opacity-60";
+  "group inline-flex h-[52px] w-full items-center justify-center gap-2 rounded-full bg-[#E5251B] text-[15px] font-bold text-white shadow-[0_1px_0_rgba(255,255,255,0.18)_inset,0_6px_16px_-6px_rgba(229,37,27,0.6)] transition-[background-color,transform,box-shadow] duration-200 ease-out hover:bg-[#CF2017] active:scale-[0.985] disabled:pointer-events-none disabled:opacity-60";
 
 const inputBase =
   "h-[56px] w-full rounded-xl border bg-white px-4 pb-2 pt-6 text-base text-[#141414] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-transparent";
@@ -408,12 +408,23 @@ export default function AuthModal({
               ) : (
                 "Verify & log in"
               )
-            ) : mode === "login" && method === "password" ? (
-              "Log in"
-            ) : mode === "login" ? (
-              "Email me a code"
             ) : (
-              "Send verification code"
+              <>
+                {mode === "login" && method === "password"
+                  ? "Log in"
+                  : mode === "login"
+                    ? "Continue with email"
+                    : "Create account"}
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  className="transition-transform duration-200 group-hover:translate-x-0.5"
+                >
+                  <path d="M5 12h14m-5-5l5 5-5 5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </>
             )}
           </button>
 
@@ -427,7 +438,7 @@ export default function AuthModal({
               }}
               className="mt-3.5 block w-full text-center text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
             >
-              {method === "otp" ? "Use password instead" : "Email me a code instead"}
+              {method === "otp" ? "Log in with password instead" : "Log in with a one-time code instead"}
             </button>
           )}
 
@@ -446,9 +457,12 @@ export default function AuthModal({
             {googleLoading ? (
               <span className="inline-block h-[18px] w-[18px] animate-[hwSpin_0.7s_linear_infinite] rounded-full border-2 border-[#EDE6E3] border-t-[#6B6B6B]" />
             ) : (
-              <span className="flex h-5 w-5 items-center justify-center rounded-full border border-[#EDE6E3] text-xs font-black">
-                G
-              </span>
+              <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z" />
+                <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+                <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z" />
+                <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z" />
+              </svg>
             )}
             Continue with Google
           </button>
