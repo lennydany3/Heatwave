@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms & Conditions" updated="30 October 2026">
+    <LegalPage title="Terms & Conditions" updated="1 November 2026">
       <Section heading="1. Acceptance of these terms">
         <p>
           By creating an account, registering for an event, or making a payment through
@@ -48,9 +48,11 @@ export default function TermsPage() {
 
       <Section heading="4. Payments">
         <p>
-          All payments are processed securely by Razorpay in Indian Rupees (₹). We don&apos;t
-          store your card, UPI, or bank details. By paying, you also agree to Razorpay&apos;s own
-          terms for payment processing.
+          All payments are made in Indian Rupees (₹) via UPI, directly from your own UPI app to
+          our UPI ID. After paying, you submit the UPI transaction ID and a screenshot of the
+          payment so we can verify it. We never see or store your UPI PIN, card, or bank account
+          details. Your ticket is valid for entry only once we&apos;ve verified the payment; if we
+          can&apos;t find a matching payment, the registration may be marked unsuccessful.
         </p>
       </Section>
 

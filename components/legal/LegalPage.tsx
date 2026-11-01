@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import Navbar from "@/components/Navbar";
 import { SUPPORT_EMAIL } from "@/lib/support";
 
 export default function LegalPage({
@@ -16,22 +17,9 @@ export default function LegalPage({
       className="flex min-h-screen flex-col bg-white text-[#141414]"
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="border-b border-[#EDE6E3]">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-6 py-[18px]">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]"
-          >
-            heatwave
-            <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
-          </Link>
-          <Link href="/" className="text-sm font-medium text-[#6B6B6B] hover:text-[#141414]">
-            ← Back to event
-          </Link>
-        </div>
-      </header>
+      <Navbar />
 
-      <main className="mx-auto w-full max-w-[760px] flex-1 px-6 py-16">
+      <main className="mx-auto w-full max-w-[760px] flex-1 px-5 py-10 sm:px-6 sm:py-16">
         <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">LEGAL</div>
         <h1 className="m-0 mt-3 text-[36px] font-black leading-[1.05] tracking-[-0.04em] sm:text-[48px]">
           {title}
