@@ -1,11 +1,13 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import SupportModal from "@/components/SupportModal";
+import { EVENT } from "@/lib/event";
 import { createClient } from "@/utils/supabase/client";
 
 type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in" | "Verifying" | "Payment failed";
@@ -102,19 +104,25 @@ function relativeWhen(iso: string | null): string {
 // A ticket still being verified shows it locked; a failed one shows no QR at all.
 function TicketStub({ t, size }: { t: Ticket; size: number }) {
   const box = size + 24;
+  // Small stubs (inside the ticket card) drop the captions and keep just the icon.
+  const small = size < 120;
   if (t.status === "Payment failed") {
     return (
       <div
         style={{ width: box, height: box }}
-        className="flex flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-[#F3C9C5] bg-[#FFF8F7] p-3 text-center"
+        className="flex flex-none flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-[#F3C9C5] bg-[#FFF8F7] p-3 text-center"
       >
         <span className="flex h-11 w-11 items-center justify-center rounded-full bg-[#FDECEA]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M6 6l12 12M18 6L6 18" stroke="#B71C14" strokeWidth="2.6" strokeLinecap="round" />
           </svg>
         </span>
-        <span className="text-sm font-black text-[#B71C14]">Ticket not valid</span>
-        <span className="text-[11px] leading-snug text-[#9A6A66]">No QR is issued for a failed payment</span>
+        {!small && (
+          <>
+            <span className="text-sm font-black text-[#B71C14]">Ticket not valid</span>
+            <span className="text-[11px] leading-snug text-[#9A6A66]">No QR is issued for a failed payment</span>
+          </>
+        )}
       </div>
     );
   }
@@ -122,7 +130,7 @@ function TicketStub({ t, size }: { t: Ticket; size: number }) {
   return (
     <div
       style={{ width: box, height: box }}
-      className="relative flex items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-3"
+      className="relative flex flex-none items-center justify-center rounded-xl border border-[#EDE6E3] bg-white p-3"
     >
       <div style={locked ? { filter: "blur(5px)", opacity: 0.45 } : undefined}>
         <QRCodeSVG value={t.bid} size={size} />
@@ -135,25 +143,78 @@ function TicketStub({ t, size }: { t: Ticket; size: number }) {
               <path d="M8 11V8a4 4 0 018 0v3" stroke="#8A5A00" strokeWidth="2" strokeLinecap="round" />
             </svg>
           </span>
-          <span className="text-xs font-black text-[#8A5A00]">Activates once verified</span>
+          {!small && <span className="text-xs font-black text-[#8A5A00]">Activates once verified</span>}
         </div>
       )}
       {t.status === "Checked-in" && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-white/80 text-sm font-black text-[#141414]">
-          Already used
+        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-white/80 text-center text-sm font-black text-[#141414]">
+          {small ? "Used" : "Already used"}
         </div>
       )}
     </div>
   );
 }
 
-const ACCENT: Record<TicketStatus, string> = {
-  Confirmed: "#E5251B",
-  "Checked-in": "#141414",
-  Cancelled: "#B5ADA9",
-  Verifying: "#D99A1E",
-  "Payment failed": "#B71C14",
+const STUB_NOTE: Record<TicketStatus, (t: Ticket) => string> = {
+  Confirmed: () => "Show this QR at the gate.",
+  Verifying: () => "Your QR activates once we verify your UPI payment.",
+  "Payment failed": (t) =>
+    t.canRetry ? "We couldn't find your payment." : "This registration couldn't be approved.",
+  "Checked-in": () => "You're checked in. Enjoy the night!",
+  Cancelled: () => "This ticket was cancelled.",
 };
+
+const primaryBtn =
+  "inline-flex items-center justify-center rounded-full font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
+
+const glassBtn =
+  "inline-flex items-center justify-center rounded-full border border-white/30 bg-white/10 px-3 font-bold text-white backdrop-blur-md transition-colors hover:bg-white hover:text-[#141414]";
+
+// Cuts half-circle notches into the edges of each ticket half, so whatever is
+// behind the ticket shows through them.
+function notch(edge: "top" | "bottom"): React.CSSProperties {
+  const y = edge === "top" ? "0" : "100%";
+  const mask =
+    `radial-gradient(circle at 0 ${y}, transparent 11px, #000 11.5px) left / 51% 100% no-repeat, ` +
+    `radial-gradient(circle at 100% ${y}, transparent 11px, #000 11.5px) right / 51% 100% no-repeat`;
+  return { WebkitMask: mask, mask };
+}
+
+function StatusBadge({ status, small = false }: { status: TicketStatus; small?: boolean }) {
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full font-bold ${
+        small ? "px-2 py-0.5 text-[11px]" : "px-2.5 py-1 text-[11px]"
+      }`}
+      style={{ background: BADGE[status].bg, color: BADGE[status].fg }}
+    >
+      <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[status].dot }} />
+      {status}
+    </span>
+  );
+}
+
+function PinIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-none text-[#E5251B]">
+      <path
+        d="M12 21s-7-6.2-7-11.5A7 7 0 0112 2.5a7 7 0 017 7C19 14.8 12 21 12 21z"
+        stroke="currentColor"
+        strokeWidth="2"
+      />
+      <circle cx="12" cy="9.5" r="2.5" stroke="currentColor" strokeWidth="2" />
+    </svg>
+  );
+}
+
+function CalendarIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-none">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="2" />
+      <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 function PlaceholderThumb({ className = "" }: { className?: string }) {
   return (
@@ -330,6 +391,18 @@ export default function DashboardPage() {
     };
   }, [user]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(null);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
   function showToast(msg: string) {
     clearTimeout(toastTimer.current);
     setToastMsg(msg);
@@ -356,13 +429,17 @@ export default function DashboardPage() {
   const counts = { upcoming: 0, past: 0, cancelled: 0 };
   view.forEach((t) => counts[t.tab]++);
 
+  const posterFor = (title: string) =>
+    title.trim().toLowerCase() === EVENT.name.toLowerCase() ? EVENT.poster : null;
+  const hlPoster = hl ? posterFor(hl.title) : null;
+
   return (
     <div
-      className="min-h-screen bg-white pb-[76px] text-[#141414] lg:pb-0"
+      className="min-h-screen bg-[#FAF7F5] pb-[calc(72px+env(safe-area-inset-bottom))] text-[#141414] lg:pb-0"
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="sticky top-0 z-20 border-b border-[#EDE6E3] bg-white">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-6 py-4">
+      <header className="sticky top-0 z-30 border-b border-[#EDE6E3] bg-white">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-3 sm:px-6 sm:py-4">
           <Link href="/" className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]">
             heatwave
             <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
@@ -379,224 +456,275 @@ export default function DashboardPage() {
           <div className="relative">
             <button
               onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Account menu"
+              aria-expanded={menuOpen}
               className="flex items-center gap-2.5"
             >
-              <span className="flex h-[38px] w-[38px] items-center justify-center rounded-full bg-[#141414] text-sm font-bold text-white">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#141414] text-sm font-bold text-white">
                 {initials}
               </span>
               <span className="hidden text-xs text-[#6B6B6B] lg:inline">▼</span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-12 w-[220px] animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] bg-white p-2 shadow-[0_8px_24px_rgba(20,20,20,.06)]">
-                <div className="mb-1.5 border-b border-[#EDE6E3] px-3 pb-3 pt-2.5">
-                  <div className="text-[15px] font-bold">{fullName}</div>
-                  <div className="text-[13px] text-[#6B6B6B]">{user?.email}</div>
+              <>
+                <div className="fixed inset-0 z-[-1]" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-12 w-[240px] animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] bg-white p-2 shadow-[0_12px_32px_rgba(20,20,20,.12)]">
+                  <div className="mb-1.5 border-b border-[#EDE6E3] px-3 pb-3 pt-2.5">
+                    <div className="truncate text-[15px] font-bold">{fullName}</div>
+                    <div className="truncate text-[13px] text-[#6B6B6B]">{user?.email}</div>
+                  </div>
+                  <Link href="#" className="block rounded-lg px-3 py-3 text-sm hover:bg-[#FAF7F5]">
+                    Profile settings
+                  </Link>
+                  <button
+                    onClick={handleLogout}
+                    className="block w-full rounded-lg px-3 py-3 text-left text-sm text-[#E5251B] hover:bg-[#FDECEA]"
+                  >
+                    Log out
+                  </button>
                 </div>
-                <Link href="#" className="block rounded-lg px-3 py-2.5 text-sm hover:bg-[#FAF7F5]">
-                  Profile settings
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="block w-full rounded-lg px-3 py-2.5 text-left text-sm text-[#E5251B] hover:bg-[#FDECEA]"
-                >
-                  Log out
-                </button>
-              </div>
+              </>
             )}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-[1200px] px-6 py-12 pb-24">
-        <div className="flex animate-[hwUp_0.5s_ease_both] flex-wrap items-end justify-between gap-5">
-          <div>
-            <h1 className="m-0 text-[40px] font-black leading-[1] tracking-[-0.05em] sm:text-[64px]">
-              Hi, {firstName}
-            </h1>
-            <p className="mt-2.5 text-[17px] text-[#6B6B6B]">
-              {counts.upcoming === 0
-                ? "Your tickets will show up here once you book."
-                : `You have ${counts.upcoming} upcoming ${counts.upcoming === 1 ? "event" : "events"}.${
-                    hl ? ` The next one is ${relativeWhen(hl.startsAt)}.` : ""
-                  }`}
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex h-[46px] items-center rounded-full border border-[#141414] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-          >
-            Browse events
-          </Link>
+      {/* Hero: poster backdrop with the next ticket */}
+      <section className="relative isolate overflow-hidden bg-[#120C0B]">
+        <div className="pointer-events-none absolute inset-0 -z-10">
+          <Image
+            src={hlPoster ?? EVENT.poster}
+            alt=""
+            fill
+            priority
+            sizes="100vw"
+            className="scale-125 object-cover opacity-70 blur-2xl"
+          />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,12,11,0.6)_0%,rgba(18,12,11,0.78)_60%,rgba(18,12,11,0.94)_100%)]" />
+          <div className="absolute left-1/2 top-[-140px] h-[340px] w-[600px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(229,37,27,0.32),transparent)]" />
         </div>
 
+        <div className="mx-auto max-w-[1200px] px-5 pb-8 pt-7 sm:px-6 sm:pb-12 sm:pt-12">
+          <div className="flex animate-[hwUp_0.5s_ease_both] flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="m-0 text-[36px] font-black leading-[1] tracking-[-0.05em] text-white sm:text-[56px]">
+                Hi, {firstName}
+              </h1>
+              <p className="mt-2 text-[14px] text-white/65 sm:text-base">
+                {loading
+                  ? "Loading your tickets…"
+                  : counts.upcoming === 0
+                    ? "Your tickets will show up here once you book."
+                    : `${counts.upcoming} upcoming ${counts.upcoming === 1 ? "event" : "events"}${
+                        hl ? ` · next ${relativeWhen(hl.startsAt)}` : ""
+                      }`}
+              </p>
+            </div>
+            <Link
+              href="/"
+              className="hidden h-11 items-center rounded-full border border-white/30 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-white hover:text-[#141414] sm:inline-flex"
+            >
+              Browse events
+            </Link>
+          </div>
+
+          {loading && (
+            <div className="mx-auto mt-6 h-[420px] max-w-[440px] animate-[hwPulse_1.4s_ease_infinite] rounded-[22px] bg-white/10 lg:mx-0" />
+          )}
+
+          {!loading && hl && (
+            <div className="mx-auto mt-6 max-w-[440px] lg:mx-0">
+              <div className="flex items-center gap-2 text-[11px] font-bold tracking-[0.14em] text-white/60">
+                <span className="h-1.5 w-1.5 animate-[hwPulse_1.4s_ease_infinite] rounded-full bg-[#E5251B]" />
+                NEXT UP · {relativeWhen(hl.startsAt).toUpperCase()}
+              </div>
+
+              {/* Ticket */}
+              <div className="mt-3 animate-[hwUp_0.6s_0.1s_ease_both] drop-shadow-[0_24px_36px_rgba(0,0,0,0.5)]">
+                <div className="overflow-hidden rounded-t-[22px] bg-white" style={notch("bottom")}>
+                  <div className="relative h-[160px] overflow-hidden bg-[#1E1716] sm:h-[180px]">
+                    {hlPoster ? (
+                      <Image
+                        src={hlPoster}
+                        alt={hl.title}
+                        fill
+                        priority
+                        sizes="440px"
+                        className="object-cover object-[center_40%]"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(229,37,27,0.45),transparent_60%)]" />
+                    )}
+                    <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,20,20,0.45)_0%,rgba(20,20,20,0)_30%,rgba(20,20,20,0.1)_55%,rgba(20,20,20,0.9)_100%)]" />
+                    <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2">
+                      <span className="rounded-full bg-black/35 px-2.5 py-1 font-mono text-[11px] font-bold text-white backdrop-blur-md">
+                        {hl.bid}
+                      </span>
+                      <StatusBadge status={hl.status} />
+                    </div>
+                    <div className="absolute inset-x-4 bottom-3.5">
+                      <div className="truncate text-[32px] font-black leading-[0.95] tracking-[-0.05em] text-white">
+                        {hl.title}
+                      </div>
+                      {hlPoster && (
+                        <div className="mt-1 text-[13px] font-bold text-[#FF6A5F]">{EVENT.presenter}</div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 pb-5 pt-4 sm:px-5">
+                    {[
+                      { label: "DATE", value: hl.date },
+                      { label: "TIME", value: hl.time },
+                      { label: "TICKET", value: hl.type },
+                      { label: "PRICE", value: fmt(hl.price) },
+                    ].map((d) => (
+                      <div key={d.label} className="min-w-0">
+                        <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">{d.label}</div>
+                        <div className="mt-0.5 truncate text-[14px] font-bold leading-snug">{d.value}</div>
+                      </div>
+                    ))}
+                    {hl.venue && (
+                      <a
+                        href={"https://maps.google.com/?q=" + encodeURIComponent(hl.venue)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="col-span-2 flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F5] px-3 py-2.5"
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <PinIcon />
+                          <span className="truncate text-[13px] font-bold">{hl.venue}</span>
+                        </span>
+                        <span className="flex-none text-[12px] font-bold text-[#E5251B]">Directions →</span>
+                      </a>
+                    )}
+                    {hl.status === "Payment failed" && <PaymentNotice t={hl} className="col-span-2 !py-2.5 !text-[13px]" />}
+                  </div>
+                </div>
+
+                <div className="rounded-b-[22px] bg-white" style={notch("top")}>
+                  <div className="mx-5 border-t-2 border-dashed border-[#EDE6E3]" />
+                  <button
+                    type="button"
+                    onClick={() => setOpen(hl.id)}
+                    className="flex w-full items-center gap-4 px-4 pb-4 pt-4 text-left sm:px-5"
+                  >
+                    <TicketStub t={hl} size={80} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">
+                        {hl.status === "Confirmed" ? "READY TO SCAN" : "TICKET STATUS"}
+                      </span>
+                      <span className="mt-1 block text-[13px] font-bold leading-snug">
+                        {STUB_NOTE[hl.status](hl)}
+                      </span>
+                      <span className="mt-1.5 block text-[12px] font-bold text-[#E5251B]">
+                        {hl.status === "Payment failed" ? "View details →" : "Tap to open ticket →"}
+                      </span>
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-4 grid animate-[hwUp_0.6s_0.2s_ease_both] grid-cols-2 gap-3">
+                {hl.status === "Payment failed" ? (
+                  <>
+                    <button onClick={() => setOpen(hl.id)} className={`${primaryBtn} h-12 text-sm`}>
+                      View details
+                    </button>
+                    {hl.canRetry ? (
+                      <Link href="/events/registations" className={`${glassBtn} h-12 text-sm`}>
+                        Register again
+                      </Link>
+                    ) : (
+                      <button onClick={() => setSupportFor(hl.bid)} className={`${glassBtn} h-12 text-sm`}>
+                        Contact support
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => setOpen(hl.id)} className={`${primaryBtn} h-12 text-sm`}>
+                      View ticket
+                    </button>
+                    <button onClick={() => downloadIcs(hl)} className={`${glassBtn} h-12 gap-2 text-sm`}>
+                      <CalendarIcon />
+                      Add to calendar
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!loading && !hl && (
+            <Link
+              href="/"
+              className="mt-6 inline-flex h-11 items-center rounded-full border border-white/30 bg-white/10 px-5 text-sm font-bold text-white backdrop-blur-md sm:hidden"
+            >
+              Browse events
+            </Link>
+          )}
+        </div>
+      </section>
+
+      <main className="mx-auto max-w-[1200px] px-5 pb-16 pt-6 sm:px-6 sm:pt-10">
         {waitlist.map((w) => {
           const invited = w.status === "invited";
           return (
             <div
               key={w.id}
-              className="mt-10 flex animate-[hwUp_0.5s_0.05s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white sm:flex-row"
+              className="mb-6 flex animate-[hwUp_0.5s_0.05s_ease_both] overflow-hidden rounded-2xl border border-[#EDE6E3] bg-white"
             >
-              <div className="w-full flex-none sm:w-1.5" style={{ background: invited ? "#3F8A5A" : "#D99A1E" }} />
-              <div className="min-w-0 flex-1 p-6 sm:p-8">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{
-                    background: invited ? "#EEF4EF" : "#FFF6E5",
-                    color: invited ? "#2F6B45" : "#8A5A00",
-                  }}
-                >
-                  <span
-                    className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: invited ? "#3F8A5A" : "#D99A1E" }}
-                  />
-                  {invited ? "Seat held for you" : "On the waitlist"}
-                </span>
-                <div className="mt-3 text-[26px] font-black leading-[1.1] tracking-[-0.03em]">
-                  {w.eventName ?? "Event"}
+              <div className="w-1.5 flex-none" style={{ background: invited ? "#3F8A5A" : "#D99A1E" }} />
+              <div className="min-w-0 flex-1 p-5 sm:p-7">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <span
+                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                      style={{
+                        background: invited ? "#EEF4EF" : "#FFF6E5",
+                        color: invited ? "#2F6B45" : "#8A5A00",
+                      }}
+                    >
+                      <span
+                        className="h-1.5 w-1.5 rounded-full"
+                        style={{ background: invited ? "#3F8A5A" : "#D99A1E" }}
+                      />
+                      {invited ? "Seat held for you" : "On the waitlist"}
+                    </span>
+                    <div className="mt-2.5 truncate text-[22px] font-black leading-[1.1] tracking-[-0.03em] sm:text-[26px]">
+                      {w.eventName ?? "Event"}
+                    </div>
+                    <div className="mt-0.5 truncate text-[13px] text-[#6B6B6B] sm:text-sm">
+                      {w.tierName ?? "Ticket"}
+                      {w.venue ? ` · ${w.venue}` : ""}
+                    </div>
+                  </div>
+                  {!invited && w.position && (
+                    <div className="flex-none text-right">
+                      <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">PLACE</div>
+                      <div className="text-[34px] font-black leading-none tracking-[-0.04em] tabular-nums">
+                        #{w.position}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="mt-1 text-sm text-[#6B6B6B]">
-                  {w.tierName ?? "Ticket"}
-                  {w.venue ? ` · ${w.venue}` : ""}
-                </div>
-                <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-[#6B6B6B]">
+                <p className="mt-3 max-w-[60ch] text-[14px] leading-relaxed text-[#6B6B6B] sm:text-[15px]">
                   {invited
-                    ? "Good news — a seat opened up and it's being held for you. Complete your registration and payment to lock it in."
-                    : `You're in line${w.position ? ` at #${w.position}` : ""}. Hang tight — good things come to those who wait. When a seat frees up we'll invite you in order, and it'll show up right here.`}
+                    ? "A seat opened up and it's being held for you. Complete your registration and payment to lock it in."
+                    : "Hang tight — when a seat frees up we'll invite you in order, and it'll show up right here."}
                 </p>
                 {invited && (
-                  <Link
-                    href="/events/registations"
-                    className="mt-5 inline-flex h-[46px] items-center rounded-full bg-[#E5251B] px-6 text-[15px] font-bold text-white hover:bg-[#B71C14]"
-                  >
+                  <Link href="/events/registations" className={`${primaryBtn} mt-4 h-12 w-full px-6 text-sm sm:w-auto`}>
                     Complete registration →
                   </Link>
                 )}
               </div>
-              {!invited && w.position && (
-                <div className="flex flex-none flex-col items-center justify-center border-t border-[#EDE6E3] bg-[#FAF7F5] px-9 py-6 sm:border-l sm:border-t-0">
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">YOUR PLACE</div>
-                  <div className="mt-1 text-[48px] font-black leading-none tracking-[-0.04em] tabular-nums">
-                    #{w.position}
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
 
-        {loading && (
-          <div className="mt-10 h-[280px] animate-[hwPulse_1.4s_ease_infinite] rounded-xl border border-[#EDE6E3] bg-[#FAF7F5]" />
-        )}
-
-        {!loading && hl && (
-          <>
-            <div className="mt-10 text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-              NEXT UP · {relativeWhen(hl.startsAt)}
-            </div>
-            <div className="mt-3.5 flex animate-[hwUp_0.5s_0.1s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white lg:flex-row">
-              <div className="flex min-w-0 flex-1">
-                <div className="w-1.5 flex-none" style={{ background: ACCENT[hl.status] }} />
-                <div className="min-w-0 flex-1 p-6 sm:p-9">
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span
-                      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                      style={{ background: BADGE[hl.status].bg, color: BADGE[hl.status].fg }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[hl.status].dot }} />
-                      {hl.status}
-                    </span>
-                    <span className="text-[13px] text-[#6B6B6B]">{hl.bid}</span>
-                  </div>
-                  <h2 className="m-0 mt-4 text-[32px] font-black leading-[1] tracking-[-0.045em] sm:text-[52px]">
-                    {hl.title}
-                  </h2>
-                  <div className="mt-7 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">DATE</div>
-                      <div className="mt-1 text-base font-bold">{hl.date}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">TIME</div>
-                      <div className="mt-1 text-base font-bold">{hl.time}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">VENUE</div>
-                      <div className="mt-1 text-base font-bold">{hl.venue}</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">TICKET</div>
-                      <div className="mt-1 text-base font-bold">{hl.type}</div>
-                    </div>
-                  </div>
-                  <PaymentNotice t={hl} className="mt-6" />
-                  <div className="mt-8 flex flex-wrap gap-2.5">
-                    <button
-                      onClick={() => setOpen(hl.id)}
-                      className="inline-flex h-12 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6.5 text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
-                    >
-                      {hl.status === "Payment failed" ? "View details" : "View ticket"}
-                    </button>
-                    {hl.status === "Payment failed" ? (
-                      hl.canRetry ? (
-                        <Link
-                          href="/events/registations"
-                          className="inline-flex h-12 items-center rounded-full border border-[#141414] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                        >
-                          Register again
-                        </Link>
-                      ) : (
-                        <button
-                          onClick={() => setSupportFor(hl.bid)}
-                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                        >
-                          Contact support
-                        </button>
-                      )
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => downloadIcs(hl)}
-                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                        >
-                          Add to calendar
-                        </button>
-                        <button
-                          onClick={() =>
-                            window.open(
-                              "https://maps.google.com/?q=" + encodeURIComponent(hl.venue),
-                              "_blank"
-                            )
-                          }
-                          className="inline-flex h-12 items-center rounded-full border border-[#EDE6E3] px-5.5 text-[15px] font-bold hover:bg-[#FAF7F5]"
-                        >
-                          Get directions
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="relative flex flex-none flex-col items-center justify-center gap-3 border-t border-dashed border-[#E0D6D2] bg-[#FAF7F5] p-7 lg:w-[260px] lg:border-l lg:border-t-0">
-                <span className="absolute -left-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
-                <span className="absolute -right-3 -top-3 h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white lg:-bottom-3 lg:-left-3 lg:right-auto lg:top-auto" />
-                <TicketStub t={hl} size={136} />
-                <div className="text-center text-xs text-[#6B6B6B]">
-                  {hl.status === "Confirmed"
-                    ? "Scan at entry"
-                    : hl.status === "Verifying"
-                      ? "Pending payment verification"
-                      : hl.status === "Payment failed"
-                        ? "Payment failed"
-                        : hl.status === "Checked-in"
-                          ? "Checked in"
-                          : "Cancelled"}
-                </div>
-              </div>
-            </div>
-          </>
-        )}
-
-        <div className="mt-14 flex gap-7 border-b border-[#EDE6E3]">
+        <div className="grid grid-cols-3 gap-1 rounded-full bg-[#EFE8E5] p-1 sm:inline-grid sm:min-w-[420px]">
           {(
             [
               ["upcoming", "Upcoming"],
@@ -607,29 +735,33 @@ export default function DashboardPage() {
             <button
               key={id}
               onClick={() => setTab(id)}
-              style={{
-                color: tab === id ? "#141414" : "#6B6B6B",
-                borderColor: tab === id ? "#E5251B" : "transparent",
-              }}
-              className="-mb-px flex items-center gap-2 border-b-2 pb-3.5 text-base font-bold transition-colors duration-200"
+              className={`flex h-10 items-center justify-center gap-1.5 rounded-full text-[13px] font-bold transition-all duration-200 sm:text-sm ${
+                tab === id ? "bg-white text-[#141414] shadow-[0_2px_8px_rgba(20,20,20,0.08)]" : "text-[#6B6B6B]"
+              }`}
             >
               {l}
-              <span className="text-xs font-medium text-[#6B6B6B]">{counts[id]}</span>
+              <span
+                className={`rounded-full px-1.5 text-[11px] tabular-nums ${
+                  tab === id ? "bg-[#FDECEA] text-[#E5251B]" : "text-[#9A918D]"
+                }`}
+              >
+                {counts[id]}
+              </span>
             </button>
           ))}
         </div>
 
         {loading && (
-          <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {[1, 2, 3].map((k) => (
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {[1, 2].map((k) => (
               <div
                 key={k}
-                className="animate-[hwPulse_1.4s_ease_infinite] overflow-hidden rounded-xl border border-[#EDE6E3]"
+                className="flex animate-[hwPulse_1.4s_ease_infinite] gap-3.5 rounded-2xl border border-[#EDE6E3] bg-white p-3"
               >
-                <div className="aspect-video bg-[#FAF7F5]" />
-                <div className="flex flex-col gap-2.5 p-4.5">
+                <div className="aspect-[4/5] w-[72px] rounded-xl bg-[#F3EEEB]" />
+                <div className="flex flex-1 flex-col justify-center gap-2.5">
                   <div className="h-3 w-2/5 rounded-full bg-[#F3EEEB]" />
-                  <div className="h-4.5 w-4/5 rounded-full bg-[#F3EEEB]" />
+                  <div className="h-4 w-4/5 rounded-full bg-[#F3EEEB]" />
                   <div className="h-3 w-3/5 rounded-full bg-[#F3EEEB]" />
                 </div>
               </div>
@@ -638,147 +770,144 @@ export default function DashboardPage() {
         )}
 
         {!loading && rest.length > 0 && (
-          <div className="mt-7 grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
-            {rest.map((c) => (
-              <div
-                key={c.id}
-                className="animate-[hwUp_0.5s_ease_both] overflow-hidden rounded-xl border border-[#EDE6E3] bg-white transition-transform duration-250 hover:-translate-y-1"
-              >
-                <div className="relative aspect-video">
-                  <PlaceholderThumb className="h-full w-full" />
-                  <span
-                    className="pointer-events-none absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                    style={{ background: BADGE[c.status].bg, color: BADGE[c.status].fg }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[c.status].dot }} />
-                    {c.status}
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {rest.map((c) => {
+              const poster = posterFor(c.title);
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => setOpen(c.id)}
+                  className="flex animate-[hwUp_0.5s_ease_both] items-center gap-3.5 rounded-2xl border border-[#EDE6E3] bg-white p-3 text-left transition-transform duration-200 active:scale-[0.99] sm:hover:-translate-y-0.5"
+                >
+                  <div className="relative aspect-[4/5] w-[72px] flex-none overflow-hidden rounded-xl">
+                    {poster ? (
+                      <Image
+                        src={poster}
+                        alt=""
+                        fill
+                        sizes="72px"
+                        className={`object-cover ${c.status === "Cancelled" ? "grayscale" : ""}`}
+                      />
+                    ) : (
+                      <PlaceholderThumb className="h-full w-full" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <StatusBadge status={c.status} small />
+                    <div className="mt-1.5 truncate text-[17px] font-black tracking-[-0.02em]">{c.title}</div>
+                    <div className="mt-0.5 truncate text-[13px] text-[#6B6B6B]">
+                      {c.date} · {c.time}
+                    </div>
+                    <div className="mt-0.5 truncate font-mono text-[11px] text-[#9A918D]">
+                      {c.type} · {c.bid}
+                    </div>
+                  </div>
+                  <span className="flex h-9 w-9 flex-none items-center justify-center rounded-full bg-[#FAF7F5] text-[#E5251B]">
+                    →
                   </span>
-                </div>
-                <div className="p-5">
-                  <div className="text-[13px] text-[#6B6B6B]">
-                    {c.date} · {c.time}
-                  </div>
-                  <div className="mt-1.5 text-[19px] font-black tracking-[-0.02em]">{c.title}</div>
-                  <div className="mt-1 text-sm text-[#6B6B6B]">{c.type}</div>
-                  <div className="mt-4.5 flex items-center justify-between gap-3 border-t border-[#EDE6E3] pt-3.5">
-                    <span className="text-xs tabular-nums text-[#6B6B6B]">{c.bid}</span>
-                    <span className="flex gap-4">
-                      <button
-                        onClick={() => setOpen(c.id)}
-                        className="text-sm font-bold text-[#E5251B] hover:text-[#B71C14]"
-                      >
-                        View
-                      </button>
-                      <button
-                        onClick={() => downloadIcs(c)}
-                        className="text-sm font-bold hover:text-[#E5251B]"
-                      >
-                        Download
-                      </button>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
 
         {!loading && inTab.length === 0 && (
-          <div className="mt-7 flex animate-[hwUp_0.5s_ease_both] flex-col items-center rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] px-6 py-16 text-center">
-            <div className="h-12 w-[220px] overflow-hidden">
+          <div className="mt-5 flex animate-[hwUp_0.5s_ease_both] flex-col items-center rounded-2xl border border-[#EDE6E3] bg-white px-6 py-12 text-center">
+            <div className="h-10 w-[200px] overflow-hidden">
               <Wave />
             </div>
-            <div className="mt-5 text-[26px] font-black tracking-[-0.03em]">
+            <div className="mt-4 text-[22px] font-black tracking-[-0.03em]">
               {tab === "upcoming" ? "No tickets yet" : tab === "past" ? "No past events" : "Nothing cancelled"}
             </div>
-            <div className="mt-2 text-base text-[#6B6B6B]">
+            <div className="mt-1.5 text-[15px] text-[#6B6B6B]">
               {tab === "upcoming"
                 ? "Find something worth going to this weekend."
                 : "Events you attend or cancel will appear here."}
             </div>
-            <Link
-              href="/"
-              className="mt-6 inline-flex h-12 items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-6.5 text-[15px] font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
-            >
-              Explore events
-            </Link>
+            {tab === "upcoming" && (
+              <Link href="/" className={`${primaryBtn} mt-5 h-12 px-6 text-sm`}>
+                Explore events
+              </Link>
+            )}
           </div>
+        )}
+
+        {!loading && tab === "upcoming" && hl && rest.length === 0 && (
+          <p className="mt-5 text-center text-[13px] text-[#9A918D]">
+            That&apos;s all your upcoming tickets.
+          </p>
         )}
       </main>
 
       {cur && (
         <div
           onClick={() => setOpen(null)}
-          className="fixed inset-0 z-50 flex items-end justify-center bg-[#141414]/36 p-0 lg:items-center lg:p-6"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-[#141414]/50 p-0 backdrop-blur-[2px] lg:items-center lg:p-6"
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="max-h-[92vh] w-full max-w-[820px] animate-[hwUp_0.3s_ease_both] overflow-auto rounded-t-2xl bg-white lg:max-h-[90vh] lg:rounded-xl"
+            role="dialog"
+            aria-modal="true"
+            className="max-h-[92dvh] w-full max-w-[820px] animate-[hwUp_0.3s_ease_both] overflow-y-auto overscroll-contain rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] lg:max-h-[90vh] lg:rounded-2xl lg:pb-0"
           >
-            <div className="flex items-center justify-between gap-4 border-b border-[#EDE6E3] px-6 py-5">
+            <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-[#EDE6E3] lg:hidden" />
+            <div className="flex items-center justify-between gap-4 border-b border-[#EDE6E3] px-5 py-3.5 lg:px-6 lg:py-5">
               <div className="flex items-center gap-2.5">
                 <span className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">TICKET</span>
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{ background: BADGE[cur.status].bg, color: BADGE[cur.status].fg }}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: BADGE[cur.status].dot }} />
-                  {cur.status}
-                </span>
+                <StatusBadge status={cur.status} />
               </div>
               <button
                 onClick={() => setOpen(null)}
                 aria-label="Close"
-                className="flex h-9 w-9 items-center justify-center rounded-full text-xl text-[#6B6B6B] hover:bg-[#FAF7F5] hover:text-[#141414]"
+                className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-[#6B6B6B] hover:bg-[#FAF7F5] hover:text-[#141414]"
               >
                 ×
               </button>
             </div>
-            <div className="flex flex-wrap">
-              <div className="flex flex-1 basis-[280px] flex-col items-center gap-4 border-r border-[#EDE6E3] bg-[#FAF7F5] p-7">
-                <TicketStub t={cur} size={192} />
-                <div className="text-center">
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">BOOKING ID</div>
-                  <div className="mt-1 text-lg font-black tracking-[0.02em] tabular-nums">{cur.bid}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">ATTENDEE</div>
-                  <div className="mt-1 text-base font-bold">{fullName}</div>
+            <div className="grid lg:grid-cols-[1fr_1.4fr]">
+              <div className="flex flex-col items-center gap-4 border-b border-[#EDE6E3] bg-[#FAF7F5] px-5 py-6 lg:border-b-0 lg:border-r lg:p-7">
+                <TicketStub t={cur} size={196} />
+                <div className="grid w-full max-w-[300px] grid-cols-2 gap-3 text-center">
+                  <div>
+                    <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">BOOKING ID</div>
+                    <div className="mt-0.5 font-mono text-[15px] font-bold tabular-nums">{cur.bid}</div>
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">ATTENDEE</div>
+                    <div className="mt-0.5 truncate text-[15px] font-bold">{fullName}</div>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-[1.4_1_320px] flex-col gap-5.5 p-7">
+              <div className="flex flex-col gap-4 px-5 py-5 lg:gap-5 lg:p-7">
                 <div>
-                  <div className="text-[28px] font-black leading-[1.05] tracking-[-0.035em]">
+                  <div className="text-[26px] font-black leading-[1.05] tracking-[-0.035em] lg:text-[28px]">
                     {cur.title}
                   </div>
-                  <div className="mt-2 text-[15px] leading-relaxed text-[#6B6B6B]">
+                  <div className="mt-1.5 text-[14px] leading-relaxed text-[#6B6B6B] lg:text-[15px]">
                     {cur.date} · {cur.time}
                     <br />
                     {cur.venue}
                   </div>
                 </div>
                 <PaymentNotice t={cur} />
-                <div className="flex flex-col gap-2.5 rounded-xl border border-[#EDE6E3] p-4.5 text-[15px]">
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">PAYMENT</div>
+                <div className="flex flex-col gap-2 rounded-xl border border-[#EDE6E3] p-4 text-[14px] lg:text-[15px]">
+                  <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">PAYMENT</div>
                   <div className="flex justify-between">
                     <span>{cur.type}</span>
-                    <span>{fmt(cur.price)}</span>
+                    <span className="tabular-nums">{fmt(cur.price)}</span>
                   </div>
-                  <div className="flex justify-between border-t border-[#EDE6E3] pt-2.5 font-black">
+                  <div className="flex justify-between border-t border-[#EDE6E3] pt-2 font-black">
                     <span>Paid via UPI</span>
-                    <span>{fmt(cur.price)}</span>
+                    <span className="tabular-nums">{fmt(cur.price)}</span>
                   </div>
                   {cur.upiTxnId && (
-                    <div className="text-[13px] tabular-nums text-[#6B6B6B]">
-                      Transaction ID {cur.upiTxnId}
-                    </div>
+                    <div className="text-[12px] tabular-nums text-[#6B6B6B]">Transaction ID {cur.upiTxnId}</div>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2.5">
-                  <button
-                    onClick={() => downloadIcs(cur)}
-                    className="inline-flex h-[46px] items-center rounded-full bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right px-5.5 text-sm font-bold text-white transition-[background-position] duration-400 ease-out hover:bg-left"
-                  >
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button onClick={() => downloadIcs(cur)} className={`${primaryBtn} h-12 gap-2 text-sm`}>
+                    <CalendarIcon />
                     Add to calendar
                   </button>
                   <button
@@ -788,7 +917,7 @@ export default function DashboardPage() {
                       }
                       showToast("Ticket link copied");
                     }}
-                    className="inline-flex h-[46px] items-center rounded-full border border-[#EDE6E3] px-5 text-sm font-bold hover:bg-[#FAF7F5]"
+                    className="inline-flex h-12 items-center justify-center rounded-full border border-[#EDE6E3] px-5 text-sm font-bold hover:bg-[#FAF7F5]"
                   >
                     Share
                   </button>
@@ -802,23 +931,43 @@ export default function DashboardPage() {
       <SupportModal open={supportFor !== null} onClose={() => setSupportFor(null)} bookingId={supportFor} />
 
       {toastMsg && (
-        <div className="fixed bottom-[92px] left-1/2 z-[60] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white lg:bottom-8">
+        <div className="fixed bottom-[calc(88px+env(safe-area-inset-bottom))] left-1/2 z-[60] flex -translate-x-1/2 animate-[hwUp_0.3s_ease_both] items-center gap-2.5 whitespace-nowrap rounded-full bg-[#141414] px-5 py-3 text-sm text-white lg:bottom-8">
           <span className="h-1.5 w-1.5 rounded-full bg-[#6FBF8A]" />
           {toastMsg}
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-[#EDE6E3] bg-white px-2 pb-3.5 pt-2 lg:hidden">
-        <Link href="#" className="flex flex-col items-center gap-1.5 p-1.5 text-xs font-bold text-[#E5251B]">
-          <span className="h-4 w-[22px] rounded border-2 border-current" />
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-[#EDE6E3] bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
+        <Link href="/dashboard" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#E5251B]">
+          <span className="flex h-7 w-12 items-center justify-center rounded-full bg-[#FDECEA]">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M4 7a2 2 0 012-2h12a2 2 0 012 2v2a2.5 2.5 0 000 5v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2.5 2.5 0 000-5V7z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+              <path d="M14 5v13" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2.5" />
+            </svg>
+          </span>
           Tickets
         </Link>
-        <Link href="/" className="flex flex-col items-center gap-1.5 p-1.5 text-xs font-bold text-[#6B6B6B]">
-          <span className="h-[18px] w-[18px] rounded-full border-2 border-current" />
+        <Link href="/" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
+          <span className="flex h-7 w-12 items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+              <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+            </svg>
+          </span>
           Events
         </Link>
-        <Link href="#" className="flex flex-col items-center gap-1.5 p-1.5 text-xs font-bold text-[#6B6B6B]">
-          <span className="h-[18px] w-[18px] rounded-t-full rounded-bl-full border-2 border-current" />
+        <Link href="#" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
+          <span className="flex h-7 w-12 items-center justify-center">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8.5" r="3.8" stroke="currentColor" strokeWidth="2" />
+              <path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </span>
           Profile
         </Link>
       </nav>

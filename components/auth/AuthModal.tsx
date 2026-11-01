@@ -179,6 +179,15 @@ export default function AuthModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   async function handleSubmit(e: FormEvent) {
@@ -260,9 +269,12 @@ export default function AuthModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-[440px] animate-[hwUp_0.3s_ease_both] overflow-hidden rounded-t-2xl bg-white sm:rounded-2xl"
+        role="dialog"
+        aria-modal="true"
+        className="max-h-[92dvh] w-full max-w-[440px] animate-[hwUp_0.3s_ease_both] overflow-y-auto overscroll-contain rounded-t-3xl bg-white pb-[env(safe-area-inset-bottom)] sm:max-h-[calc(100dvh-3rem)] sm:rounded-2xl sm:pb-0"
       >
-        <div className="flex items-center justify-between gap-4 border-b border-[#EDE6E3] px-6 py-5">
+        <div className="mx-auto mt-2.5 h-1 w-10 rounded-full bg-[#EDE6E3] sm:hidden" />
+        <div className="flex items-center justify-between gap-4 border-b border-[#EDE6E3] px-5 py-3.5 sm:px-6 sm:py-5">
           <div className="flex items-center gap-1.5 text-lg font-black tracking-[-0.04em]">
             heatwave
             <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
@@ -276,8 +288,8 @@ export default function AuthModal({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6">
-          <h2 className="m-0 text-[26px] font-black tracking-[-0.03em]">
+        <form onSubmit={handleSubmit} className="px-5 pb-6 pt-5 sm:px-6 sm:py-6">
+          <h2 className="m-0 text-[24px] font-black tracking-[-0.03em] sm:text-[26px]">
             {step === "code"
               ? "Enter your code"
               : mode === "login"
