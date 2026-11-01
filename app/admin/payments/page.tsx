@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
+import HeatwaveLoader from "@/components/HeatwaveLoader";
 import { fmt } from "../_lib/data";
 import { createClient } from "@/utils/supabase/client";
 
@@ -141,7 +142,9 @@ export default function AdminPaymentsPage() {
         </div>
 
         {loading && (
-          <div className="px-6 py-14 text-center text-sm text-[#6B6B6B]">Loading transactions…</div>
+          <div className="px-6 py-16">
+            <HeatwaveLoader label="Loading transactions" />
+          </div>
         )}
 
         {!loading && (

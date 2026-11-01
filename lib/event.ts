@@ -1,8 +1,10 @@
 // Single source of truth for the event shown on the site. The `slug` must match
-// the row in `events` (see supabase/caseano-event.sql); the display fields are
-// used as-is by the UI, so the page still reads correctly before the row loads.
+// the row in `events`; it's an internal id, so it stays as the originally seeded
+// value even though the event itself is now Caseano (supabase/caseano-event.sql
+// updates that row's name, venue and start time). Display fields are used as-is
+// by the UI, so the page reads correctly even before the row is updated.
 export const EVENT = {
-  slug: "caseano-heatwave-x-moxie",
+  slug: "product-builders-summit-2027",
   name: "Caseano",
   presenter: "Heatwave × Moxie Club",
   tagline: "Chennai's first-ever cruise party",

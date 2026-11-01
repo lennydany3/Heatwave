@@ -7,6 +7,7 @@ import { useEffect, useState, type MouseEvent } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import AuthModal from "@/components/auth/AuthModal";
 import { EVENT } from "@/lib/event";
+import { createClient } from "@/utils/supabase/client";
 
 const btn =
   "inline-flex items-center justify-center gap-2.5 rounded-full text-white font-bold transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left";
@@ -34,23 +35,33 @@ function Wave({ className = "" }: { className?: string }) {
   );
 }
 
-const INFO = [
-  { label: "DATE", value: EVENT.dateLabel },
-  { label: "TIME", value: EVENT.timeLabel },
-  { label: "VENUE", value: EVENT.venueShort },
-  { label: "PRICE", value: "From ₹899" },
+type Tier = {
+  id: string;
+  name: string;
+  price_male: number | null;
+  price_female: number | null;
+  status: "open" | "coming_soon" | "closed";
+};
+
+// Shown until the live tiers load (or if they can't be fetched).
+const FALLBACK_TIERS: Tier[] = [
+  { id: "early_bird", name: "Early Bird", price_male: 999, price_female: 899, status: "open" },
+  { id: "phase_1", name: "Phase 1", price_male: null, price_female: null, status: "coming_soon" },
 ];
+
+const TIER_NOTE: Record<Tier["status"], string> = {
+  open: "Limited early-bird price",
+  coming_soon: "Announced soon",
+  closed: "Sold out",
+};
+
+const money = (n: number | null) => (n ? "₹" + n.toLocaleString("en-IN") : "× × ×");
 
 const HIGHLIGHTS = [
   "A 4-hour cruise on the waters of Muthukadu",
   "Electrifying vibes and incredible music",
   "Exclusive activities and experiences onboard",
   "A few surprises we're keeping under wraps",
-];
-
-const PRICES = [
-  { name: "Early Bird", male: "₹999", female: "₹899", open: true },
-  { name: "Phase 1", male: "× × ×", female: "× × ×", open: false },
 ];
 
 const FAQS = [
@@ -68,13 +79,14 @@ const FAQS = [
   },
   {
     q: "Why are prices different for male and female?",
-    a: "Early Bird tickets are ₹899 for female and ₹999 for male. Phase 1 pricing will be announced soon.",
+    a: "Pricing is set per gender for each ticket phase. The current prices are listed in the Tickets section above, and the next phase will be announced soon.",
   },
 ];
 
 export default function EventPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
+  const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
@@ -90,6 +102,29 @@ export default function EventPage() {
   }, []);
 
   useEffect(() => {
+    let cancelled = false;
+    async function loadTiers() {
+      const supabase = createClient();
+      const { data: ev } = await supabase
+        .from("events")
+        .select("id")
+        .eq("slug", EVENT.slug)
+        .single();
+      if (!ev || cancelled) return;
+      const { data } = await supabase
+        .from("ticket_tiers")
+        .select("id, name, price_male, price_female, status")
+        .eq("event_id", ev.id)
+        .order("sort_order");
+      if (!cancelled && data && data.length > 0) setTiers(data as Tier[]);
+    }
+    loadTiers();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     // Reads the proxy's redirect params (window isn't available during SSR,
     // so this can't be computed during render).
     const params = new URLSearchParams(window.location.search);
@@ -99,6 +134,18 @@ export default function EventPage() {
       setAuthOpen(true);
     }
   }, []);
+
+  const openTier = tiers.find((t) => t.status === "open");
+  const openPrices = openTier
+    ? [openTier.price_male, openTier.price_female].filter((n): n is number => !!n)
+    : [];
+  const fromPrice = openPrices.length ? "₹" + Math.min(...openPrices).toLocaleString("en-IN") : "TBA";
+  const info = [
+    { label: "DATE", value: EVENT.dateLabel },
+    { label: "TIME", value: EVENT.timeLabel },
+    { label: "VENUE", value: EVENT.venueShort },
+    { label: "PRICE", value: openPrices.length ? `From ${fromPrice}` : "Announced soon" },
+  ];
 
   function handleRegisterClick(e: MouseEvent) {
     e.preventDefault();
@@ -195,7 +242,7 @@ export default function EventPage() {
             </div>
 
             <div className="mt-11 grid grid-cols-2 gap-x-7 gap-y-6 border-t border-[#EDE6E3] pt-6 sm:grid-cols-4">
-              {INFO.map((item) => (
+              {info.map((item) => (
                 <div key={item.label}>
                   <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
                     {item.label}
@@ -272,10 +319,10 @@ export default function EventPage() {
             Pick your wave
           </h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {PRICES.map((tier) => (
+            {tiers.map((tier) => (
               <div
-                key={tier.name}
-                style={{ opacity: tier.open ? 1 : 0.6 }}
+                key={tier.id}
+                style={{ opacity: tier.status === "open" ? 1 : 0.6 }}
                 className="rounded-xl border border-[#EDE6E3] p-7"
               >
                 <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
@@ -283,15 +330,17 @@ export default function EventPage() {
                 </div>
                 <div className="mt-4 flex justify-between text-base">
                   <span className="text-[#6B6B6B]">Female</span>
-                  <span className="text-[26px] font-black tracking-[-0.03em]">{tier.female}</span>
+                  <span className="text-[26px] font-black tracking-[-0.03em]">
+                    {money(tier.status === "open" ? tier.price_female : null)}
+                  </span>
                 </div>
                 <div className="mt-2 flex justify-between text-base">
                   <span className="text-[#6B6B6B]">Male</span>
-                  <span className="text-[26px] font-black tracking-[-0.03em]">{tier.male}</span>
+                  <span className="text-[26px] font-black tracking-[-0.03em]">
+                    {money(tier.status === "open" ? tier.price_male : null)}
+                  </span>
                 </div>
-                <div className="mt-4 text-sm text-[#6B6B6B]">
-                  {tier.open ? "Limited early-bird price" : "Announced soon"}
-                </div>
+                <div className="mt-4 text-sm text-[#6B6B6B]">{TIER_NOTE[tier.status]}</div>
               </div>
             ))}
           </div>
@@ -400,11 +449,11 @@ export default function EventPage() {
                 FROM
               </div>
               <div className="text-xl font-black tracking-[-0.02em]">
-                ₹899
+                {fromPrice}
               </div>
             </div>
             <div className="text-sm text-[#6B6B6B]">
-              <span className="font-bold text-[#E5251B]">Early Birds</span>{" "}
+              <span className="font-bold text-[#E5251B]">{openTier?.name ?? "Tickets"}</span>{" "}
               · Sat, 12 Dec
             </div>
           </div>

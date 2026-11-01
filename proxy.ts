@@ -4,6 +4,12 @@ import { updateSession } from "@/utils/supabase/middleware";
 const PROTECTED_PREFIXES = ["/events/registations", "/dashboard"];
 const ADMIN_LOGIN_PATH = "/admin/login";
 
+// Admin role lookups are cached briefly: every admin navigation (and its
+// prefetches) passes through here, and a DB round trip each time made the
+// sidebar feel slow. A demoted admin loses access within the TTL.
+const ADMIN_TTL_MS = 60_000;
+const adminCache = new Map<string, number>();
+
 function redirectWithRefreshedCookies(
   url: URL,
   supabaseResponse: NextResponse
@@ -40,12 +46,18 @@ export async function proxy(request: NextRequest) {
         supabaseResponse
       );
     }
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "admin") {
+    let isAdmin = (adminCache.get(user.id) ?? 0) > Date.now();
+    if (!isAdmin) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      isAdmin = profile?.role === "admin";
+      if (isAdmin) adminCache.set(user.id, Date.now() + ADMIN_TTL_MS);
+      else adminCache.delete(user.id);
+    }
+    if (!isAdmin) {
       const url = new URL(ADMIN_LOGIN_PATH, request.url);
       url.searchParams.set("error", "not-admin");
       return redirectWithRefreshedCookies(url, supabaseResponse);

@@ -925,12 +925,12 @@ export default function RegisterForm({
               {EVENT.presenter.toUpperCase()}
             </div>
             <div className="mt-1 text-xl font-black leading-[1.15] tracking-[-0.025em]">
-              {event?.name ?? EVENT.name}
+              {EVENT.name}
             </div>
             <div className="mt-2 text-sm leading-relaxed text-[#6B6B6B]">
               {EVENT.dateLabel} · {EVENT.timeLabel}
               <br />
-              {event?.venue ?? EVENT.venue}
+              {EVENT.venue}
             </div>
             {selectedTier && (
               <div className="mt-5 flex items-baseline justify-between border-t border-[#EDE6E3] pt-4">

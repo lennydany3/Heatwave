@@ -3,10 +3,12 @@
 import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
+import HeatwaveLoader from "@/components/HeatwaveLoader";
 import { fmt } from "../_lib/data";
+import type { VerifyState } from "@/lib/verification";
 
-type VerifyStatus = "pending" | "paid" | "failed";
-type Filter = "pending" | "paid" | "failed" | "all";
+type Filter = VerifyState | "all";
+type Reasoned = "pending" | "declined" | "unsuccessful";
 
 type Submission = {
   id: string;
@@ -14,7 +16,7 @@ type Submission = {
   email: string;
   mobile: string;
   amount: number;
-  status: VerifyStatus;
+  decision: VerifyState;
   upiTxnId: string;
   note: string | null;
   verifiedAt: string | null;
@@ -24,37 +26,50 @@ type Submission = {
   proofUrl: string | null;
 };
 
-const LABEL: Record<VerifyStatus, string> = {
+const LABEL: Record<VerifyState, string> = {
   pending: "Pending",
-  paid: "Verified",
-  failed: "Failed",
+  accepted: "Accepted",
+  declined: "Declined",
+  unsuccessful: "Unsuccessful",
 };
 
-const STATUS_BADGE: Record<VerifyStatus, [string, string, string]> = {
+const STATUS_BADGE: Record<VerifyState, [string, string, string]> = {
   pending: ["#FFF6E5", "#8A5A00", "#D99A1E"],
-  paid: ["#EEF4EF", "#2F6B45", "#3F8A5A"],
-  failed: ["#FDECEA", "#B71C14", "#E5251B"],
+  accepted: ["#EEF4EF", "#2F6B45", "#3F8A5A"],
+  declined: ["#FDECEA", "#B71C14", "#E5251B"],
+  unsuccessful: ["#F3EEEB", "#4A4543", "#8C8480"],
 };
 
 const FILTERS: [Filter, string][] = [
   ["pending", "Pending"],
-  ["paid", "Verified"],
-  ["failed", "Failed"],
+  ["accepted", "Accepted"],
+  ["declined", "Declined"],
+  ["unsuccessful", "Unsuccessful"],
   ["all", "All"],
 ];
 
-const QUICK_REASONS: Record<"pending" | "failed", string[]> = {
+const QUICK_REASONS: Record<Reasoned, string[]> = {
   pending: [
     "Payment not received in account yet",
     "Checking with bank",
     "Screenshot unclear — contact support",
   ],
-  failed: [
-    "Transaction ID not found",
-    "Amount paid doesn't match ticket price",
+  declined: [
+    "Couldn't confirm this is a genuine customer",
     "Screenshot doesn't match transaction ID",
     "Duplicate / reused payment",
   ],
+  unsuccessful: [
+    "Transaction ID not found in our account",
+    "Payment didn't go through",
+    "Amount paid doesn't match ticket price",
+  ],
+};
+
+const REASON_PROMPT: Record<Reasoned, string> = {
+  pending: "Why is this still pending? (optional)",
+  declined: "Why are you declining this customer?",
+  unsuccessful: "Why was this payment unsuccessful?",
 };
 
 export default function AdminVerificationPage() {
@@ -64,7 +79,7 @@ export default function AdminVerificationPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
-  const [editing, setEditing] = useState<{ id: string; status: "pending" | "failed" } | null>(
+  const [editing, setEditing] = useState<{ id: string; decision: Reasoned } | null>(
     null
   );
   const [reason, setReason] = useState("");
@@ -99,23 +114,23 @@ export default function AdminVerificationPage() {
   }, [load]);
 
   const counts = useMemo(() => {
-    const c = { pending: 0, paid: 0, failed: 0, all: rows.length };
-    rows.forEach((r) => c[r.status]++);
+    const c = { pending: 0, accepted: 0, declined: 0, unsuccessful: 0, all: rows.length };
+    rows.forEach((r) => c[r.decision]++);
     return c;
   }, [rows]);
 
-  const verifiedAmount = rows
-    .filter((r) => r.status === "paid")
+  const acceptedAmount = rows
+    .filter((r) => r.decision === "accepted")
     .reduce((a, r) => a + r.amount, 0);
   const pendingAmount = rows
-    .filter((r) => r.status === "pending")
+    .filter((r) => r.decision === "pending")
     .reduce((a, r) => a + r.amount, 0);
 
   const list = useMemo(() => {
     const query = q.trim().toLowerCase();
     return rows.filter(
       (r) =>
-        (filter === "all" || r.status === filter) &&
+        (filter === "all" || r.decision === filter) &&
         (!query ||
           (r.fullName + r.email + r.mobile + r.upiTxnId + (r.ticketCode ?? ""))
             .toLowerCase()
@@ -123,12 +138,12 @@ export default function AdminVerificationPage() {
     );
   }, [rows, filter, q]);
 
-  async function update(row: Submission, status: VerifyStatus, note = "") {
+  async function update(row: Submission, decision: VerifyState, note = "") {
     setSaving(row.id);
     const res = await fetch("/api/admin/verification", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ registrationId: row.id, status, note }),
+      body: JSON.stringify({ registrationId: row.id, decision, note }),
     });
     const data = await res.json().catch(() => null);
     setSaving(null);
@@ -138,24 +153,24 @@ export default function AdminVerificationPage() {
     }
     setEditing(null);
     setReason("");
-    showToast(`${row.fullName} marked ${LABEL[status].toLowerCase()}`);
+    showToast(`${row.fullName} marked ${LABEL[decision].toLowerCase()}`);
     await load();
   }
 
-  function startEdit(row: Submission, status: "pending" | "failed") {
-    setEditing({ id: row.id, status });
-    setReason(row.status === status ? row.note ?? "" : "");
+  function startEdit(row: Submission, decision: Reasoned) {
+    setEditing({ id: row.id, decision });
+    setReason(row.decision === decision ? row.note ?? "" : "");
     setReasonError("");
   }
 
   function saveReason(row: Submission) {
     if (!editing) return;
     const note = reason.trim();
-    if (editing.status === "failed" && !note) {
+    if (editing.decision !== "pending" && !note) {
       setReasonError("Add a reason — it's shown to the scanner at the gate");
       return;
     }
-    update(row, editing.status, note);
+    update(row, editing.decision, note);
   }
 
   return (
@@ -168,16 +183,18 @@ export default function AdminVerificationPage() {
           Verify UPI payments
         </h1>
         <p className="mt-2 max-w-[620px] text-sm leading-relaxed text-[#6B6B6B]">
-          Match each transaction ID and screenshot against your UPI account. Only verified tickets
-          pass the scanner — pending and failed tickets show your reason at check-in.
+          Match each transaction ID and screenshot against your UPI account, then mark it Accepted,
+          Declined or Unsuccessful. Only accepted tickets pass the scanner — every other ticket shows
+          your reason at check-in.
         </p>
       </div>
 
-      <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
           { l: "TO VERIFY", v: String(counts.pending), n: `${fmt(pendingAmount)} waiting` },
-          { l: "VERIFIED", v: fmt(verifiedAmount), n: `${counts.paid} tickets` },
-          { l: "FAILED", v: String(counts.failed), n: "rejected payments" },
+          { l: "ACCEPTED", v: fmt(acceptedAmount), n: `${counts.accepted} tickets` },
+          { l: "DECLINED", v: String(counts.declined), n: "not a legit customer" },
+          { l: "UNSUCCESSFUL", v: String(counts.unsuccessful), n: "payment didn't go through" },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">
             <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">{k.l}</div>
@@ -214,8 +231,8 @@ export default function AdminVerificationPage() {
         </div>
 
         {loading && (
-          <div className="border-t border-[#EDE6E3] px-6 py-14 text-center text-sm text-[#6B6B6B]">
-            Loading submissions…
+          <div className="border-t border-[#EDE6E3] px-6 py-16">
+            <HeatwaveLoader label="Loading submissions" />
           </div>
         )}
 
@@ -231,7 +248,7 @@ export default function AdminVerificationPage() {
         {!loading &&
           !loadError &&
           list.map((r) => {
-            const b = STATUS_BADGE[r.status];
+            const b = STATUS_BADGE[r.decision];
             const isEditing = editing?.id === r.id;
             const busy = saving === r.id;
             const created = new Date(r.createdAt);
@@ -266,7 +283,7 @@ export default function AdminVerificationPage() {
                       style={{ background: b[0], color: b[1] }}
                     >
                       <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                      {LABEL[r.status]}
+                      {LABEL[r.decision]}
                     </span>
                   </div>
                   <div className="mt-1 truncate text-[13px] text-[#6B6B6B]">
@@ -313,7 +330,7 @@ export default function AdminVerificationPage() {
                       </div>
                     </div>
                   </div>
-                  {r.note && r.status !== "paid" && (
+                  {r.note && r.decision !== "accepted" && (
                     <div className="mt-3 rounded-lg bg-[#FAF7F5] px-3.5 py-2.5 text-[13px]">
                       <span className="font-bold">Reason shown at scan:</span> {r.note}
                     </div>
@@ -321,13 +338,9 @@ export default function AdminVerificationPage() {
 
                   {isEditing && editing && (
                     <div className="mt-3.5 animate-[hwUp_0.2s_ease_both] rounded-xl border border-[#EDE6E3] p-4">
-                      <div className="text-sm font-bold">
-                        {editing.status === "failed"
-                          ? "Why did this payment fail?"
-                          : "Why is this still pending? (optional)"}
-                      </div>
+                      <div className="text-sm font-bold">{REASON_PROMPT[editing.decision]}</div>
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
-                        {QUICK_REASONS[editing.status].map((s) => (
+                        {QUICK_REASONS[editing.decision].map((s) => (
                           <button
                             key={s}
                             onClick={() => {
@@ -369,7 +382,7 @@ export default function AdminVerificationPage() {
                           disabled={busy}
                           className="h-9 rounded-full bg-[#141414] px-4 text-[13px] font-bold text-white disabled:opacity-50"
                         >
-                          {busy ? "Saving…" : `Mark ${LABEL[editing.status].toLowerCase()}`}
+                          {busy ? "Saving…" : `Mark ${LABEL[editing.decision].toLowerCase()}`}
                         </button>
                       </div>
                     </div>
@@ -378,26 +391,35 @@ export default function AdminVerificationPage() {
 
                 <div className="flex flex-none flex-wrap gap-2 lg:w-[132px] lg:flex-col">
                   <button
-                    onClick={() => update(r, "paid")}
-                    disabled={busy || r.status === "paid"}
+                    onClick={() => update(r, "accepted")}
+                    disabled={busy || r.decision === "accepted"}
                     className="h-9 rounded-full bg-[#2F6B45] px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-35"
                   >
-                    {r.status === "paid" ? "Verified" : "Verify"}
+                    {r.decision === "accepted" ? "Accepted" : "Accept"}
                   </button>
                   <button
-                    onClick={() => startEdit(r, "pending")}
-                    disabled={busy}
-                    className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#D99A1E] hover:text-[#8A5A00] disabled:opacity-35"
-                  >
-                    Pending
-                  </button>
-                  <button
-                    onClick={() => startEdit(r, "failed")}
+                    onClick={() => startEdit(r, "declined")}
                     disabled={busy}
                     className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B] disabled:opacity-35"
                   >
-                    Failed
+                    Decline
                   </button>
+                  <button
+                    onClick={() => startEdit(r, "unsuccessful")}
+                    disabled={busy}
+                    className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
+                  >
+                    Unsuccessful
+                  </button>
+                  {r.decision !== "pending" && (
+                    <button
+                      onClick={() => startEdit(r, "pending")}
+                      disabled={busy}
+                      className="h-8 text-xs font-bold text-[#6B6B6B] hover:text-[#8A5A00] disabled:opacity-35"
+                    >
+                      Reset to pending
+                    </button>
+                  )}
                 </div>
               </div>
             );

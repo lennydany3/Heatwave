@@ -1,9 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, type ChangeEvent } from "react";
-import { createClient } from "@/utils/supabase/client";
 
 const btn =
   "inline-flex h-14 w-full items-center justify-center gap-2.5 rounded-full text-base font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left disabled:opacity-60";
@@ -11,7 +9,6 @@ const btn =
 type FieldKey = "email" | "pw";
 
 export default function AdminLoginPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [show, setShow] = useState(false);
@@ -36,14 +33,24 @@ export default function AdminLoginPage() {
     }
     setErr("");
     setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password: pw });
-    if (error) {
+    try {
+      const res = await fetch("/api/admin/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pw }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setLoading(false);
+        setErr(data?.error ?? "Couldn't sign in — try again");
+        return;
+      }
+      // Full navigation so the app picks up the fresh session cookie.
+      window.location.href = "/admin/dashboard";
+    } catch {
       setLoading(false);
-      setErr(error.message);
-      return;
+      setErr("Network error — check your connection and try again");
     }
-    router.push("/admin/dashboard");
   }
 
   function field(key: FieldKey) {
