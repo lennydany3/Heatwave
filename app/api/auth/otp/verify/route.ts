@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -21,6 +22,13 @@ export async function POST(request: Request) {
   if (purpose === "signup" && (fullName.length < 2 || password.length < 6)) {
     return NextResponse.json({ error: "Name and password are required" }, { status: 400 });
   }
+
+  // Guessing a 6-digit code is the attack here: cap attempts per IP and per email.
+  const limited = await checkLimits([
+    ["otpVerifyIp", clientIp(request)],
+    ["otpVerifyEmail", email],
+  ]);
+  if (limited) return limited;
 
   const admin = createAdminClient();
   const { data: row } = await admin

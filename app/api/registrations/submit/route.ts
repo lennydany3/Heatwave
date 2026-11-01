@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse, after } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -41,6 +42,13 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
+
+  // Each submit uploads an image and writes rows, so keep retries and floods in check.
+  const limited = await checkLimits([
+    ["submitUser", user.id],
+    ["submitIp", clientIp(request)],
+  ]);
+  if (limited) return limited;
 
   const form = await request.formData().catch(() => null);
   if (!form) {

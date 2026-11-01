@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -13,6 +14,12 @@ export async function POST(request: Request) {
   if (typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json({ error: "Incorrect email or password" }, { status: 400 });
   }
+
+  const limited = await checkLimits([
+    ["adminLoginIp", clientIp(request)],
+    ["adminLoginEmail", email.trim().toLowerCase()],
+  ]);
+  if (limited) return limited;
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });

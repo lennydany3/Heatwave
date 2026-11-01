@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -13,6 +14,9 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+
+  const limited = await checkLimits([["waitlistUser", user.id]]);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
   const s = (k: string) => (typeof body?.[k] === "string" ? (body[k] as string).trim() : "");

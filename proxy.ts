@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
+import { clientIp, limit, tooManyRequests } from "@/lib/ratelimit";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { canView, firstPage, pageForPath, type Permissions, type Role } from "@/lib/permissions";
 
@@ -42,6 +43,12 @@ function redirectWithRefreshedCookies(
 }
 
 export async function proxy(request: NextRequest) {
+  // Blanket per-IP cap on the API; the routes below add stricter per-action limits.
+  if (request.nextUrl.pathname.startsWith("/api/")) {
+    const res = await limit("api", clientIp(request.headers));
+    if (!res.ok) return tooManyRequests(res.retryAfter);
+  }
+
   const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 

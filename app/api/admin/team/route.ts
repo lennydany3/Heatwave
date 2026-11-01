@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { sanitizePermissions, type Role } from "@/lib/permissions";
@@ -64,6 +65,8 @@ export async function GET() {
 export async function POST(request: Request) {
   const me = await requireAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const limited = await checkLimits([["adminTeam", me.id]]);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as Body | null;
   const email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
@@ -137,6 +140,8 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   const me = await requireAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const limited = await checkLimits([["adminTeam", me.id]]);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as Body | null;
   const id = body?.id;
@@ -183,6 +188,8 @@ export async function PATCH(request: Request) {
 export async function DELETE(request: Request) {
   const me = await requireAdmin();
   if (!me) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const limited = await checkLimits([["adminTeam", me.id]]);
+  if (limited) return limited;
 
   const body = (await request.json().catch(() => null)) as { id?: unknown } | null;
   if (typeof body?.id !== "string") return NextResponse.json({ error: "Invalid request body" }, { status: 400 });

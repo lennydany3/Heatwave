@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { verifyState, type Decision, type PaymentStatus } from "@/lib/verification";
@@ -86,6 +87,8 @@ export async function DELETE(request: Request) {
   if (!access || access.masked("customers", "delete")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const limited = await checkLimits([["adminDelete", access.id]]);
+  if (limited) return limited;
 
   const body = await request.json().catch(() => null);
   const registrationId = (body as { registrationId?: unknown } | null)?.registrationId;

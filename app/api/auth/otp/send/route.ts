@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import {
@@ -23,6 +24,13 @@ export async function POST(request: Request) {
   if (!EMAIL_RE.test(email) || (purpose !== "login" && purpose !== "signup")) {
     return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
   }
+
+  // Per-IP and per-email caps, before we do any work or send any email.
+  const limited = await checkLimits([
+    ["otpSendIp", clientIp(request)],
+    ["otpSendEmail", email],
+  ]);
+  if (limited) return limited;
 
   const user = await findUserByEmail(email);
   if (purpose === "signup" && user) {

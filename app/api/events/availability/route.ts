@@ -1,3 +1,4 @@
+import { checkLimits, clientIp } from "@/lib/ratelimit";
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
@@ -7,6 +8,9 @@ import { eventSeats, myInvite } from "@/lib/seats";
 // form. Browsers can't count registrations themselves (row-level security), so
 // this returns only the numbers that are safe to show.
 export async function GET(request: Request) {
+  const limited = await checkLimits([["availability", clientIp(request)]]);
+  if (limited) return limited;
+
   const slug = new URL(request.url).searchParams.get("slug");
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
 
