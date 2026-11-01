@@ -148,6 +148,11 @@ function downloadIcs(event: EventInfo | null) {
 const inputBase =
   "h-[60px] w-full rounded-xl border bg-white px-4 pb-2 pt-6 text-base text-[#141414] outline-none transition-[border-color,box-shadow] duration-150 placeholder:text-transparent";
 
+// Action row: pinned to the bottom of the screen on phones so the primary button
+// is always reachable, inline on larger screens.
+const actionBar =
+  "sticky bottom-0 z-10 -mx-5 mt-8 flex items-center justify-between gap-4 border-t border-[#EDE6E3] bg-white px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0";
+
 const btn =
   "inline-flex h-[54px] items-center justify-center gap-2.5 rounded-full px-8 text-base font-bold text-white transition-[background-position] duration-400 ease-out bg-[linear-gradient(90deg,#B71C14_50%,#E5251B_50%)] bg-[length:202%_100%] bg-right hover:bg-left disabled:opacity-60 disabled:pointer-events-none";
 
@@ -271,6 +276,7 @@ export default function RegisterForm({
   const [joining, setJoining] = useState(false);
   const [waitlistError, setWaitlistError] = useState("");
   const [supportOpen, setSupportOpen] = useState(false);
+  const [descOpen, setDescOpen] = useState(false);
   // Already queued (from the server) or just joined: show the waiting screen
   // instead of the form. An invited customer sees the normal form instead.
   const [waitlisted, setWaitlisted] = useState<{ position: number | null } | null>(
@@ -534,7 +540,7 @@ export default function RegisterForm({
   if (waitlisted) {
     return (
       <Page>
-        <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
+        <main className="mx-auto flex max-w-[640px] flex-col items-center px-5 py-10 text-center sm:px-6 sm:py-24">
           <div className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#141414]">
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
               <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8" />
@@ -565,7 +571,7 @@ export default function RegisterForm({
             {values.email ? ` (${values.email})` : ""}. You can leave this page — your place stays
             saved.
           </div>
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <div className="mt-8 flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row">
             <Link href="/dashboard" className={btn}>
               Go to My Tickets
             </Link>
@@ -605,7 +611,7 @@ export default function RegisterForm({
 
     return (
       <Page>
-        <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
+        <main className="mx-auto flex max-w-[640px] flex-col items-center px-5 py-10 text-center sm:px-6 sm:py-24">
           <div
             className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full"
             style={{ background: tone }}
@@ -686,155 +692,204 @@ export default function RegisterForm({
 
   if (step === 3 && ticketResult) {
     const who = values.fullName || user?.email || "";
-    const when = ticketResult.startsAt
-      ? new Date(ticketResult.startsAt).toLocaleString("en-IN", {
-          weekday: "short",
-          day: "numeric",
-          month: "short",
-          year: "numeric",
-          hour: "numeric",
-          minute: "2-digit",
-        })
-      : "";
+    const firstName = values.fullName?.trim().split(/\s+/)[0] ?? "";
+    const details = [
+      { label: "DATE", value: EVENT.dateLabel },
+      { label: "TIME", value: EVENT.timeLabel },
+      { label: "ATTENDEE", value: who },
+      { label: "TICKET", value: ticketResult.tierName ?? selectedTier?.name ?? "" },
+    ];
+    // Cuts the two half-circle notches into the edges of each ticket half, so the
+    // poster backdrop shows through them.
+    const notch = (edge: "top" | "bottom") => {
+      const y = edge === "top" ? "0" : "100%";
+      const mask =
+        `radial-gradient(circle at 0 ${y}, transparent 11px, #000 11.5px) left / 51% 100% no-repeat, ` +
+        `radial-gradient(circle at 100% ${y}, transparent 11px, #000 11.5px) right / 51% 100% no-repeat`;
+      return { WebkitMask: mask, mask } as React.CSSProperties;
+    };
 
     return (
       <Page>
-        <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
-          <div className="relative flex h-24 w-24 items-center justify-center">
-            <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.35s_both] rounded-full bg-[#E5251B]" />
-            <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.6s_both] rounded-full bg-[#E5251B]" />
-            {[
-              ["-130px", "-90px", "200deg", "#E5251B"],
-              ["-80px", "-130px", "-160deg", "#F5A623"],
-              ["-20px", "-150px", "240deg", "#141414"],
-              ["50px", "-140px", "-220deg", "#E5251B"],
-              ["110px", "-100px", "180deg", "#F5A623"],
-              ["140px", "-30px", "-200deg", "#141414"],
-              ["-145px", "-25px", "260deg", "#F5A623"],
-              ["120px", "50px", "-240deg", "#E5251B"],
-              ["-110px", "60px", "220deg", "#141414"],
-              ["-40px", "95px", "-180deg", "#E5251B"],
-              ["40px", "100px", "200deg", "#F5A623"],
-              ["0px", "-120px", "300deg", "#E5251B"],
-            ].map(([dx, dy, rot, color], i) => (
-              <span
-                key={i}
-                className="hw-celebrate pointer-events-none absolute left-1/2 top-1/2 -ml-1 -mt-1.5 h-3 w-2 animate-[hwBurst_1.1s_cubic-bezier(.2,.8,.3,1)_both] rounded-[2px]"
-                style={
-                  {
-                    "--dx": dx,
-                    "--dy": dy,
-                    "--rot": rot,
-                    backgroundColor: color,
-                    animationDelay: `${0.3 + (i % 4) * 0.03}s`,
-                  } as React.CSSProperties
-                }
-              />
-            ))}
-            <div className="relative flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#E5251B]">
-              <svg width="44" height="44" viewBox="0 0 24 24">
-                <path
-                  d="M5 12.5l4.5 4.5L19 7.5"
-                  fill="none"
-                  stroke="#fff"
-                  strokeWidth="2.6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray="30"
-                  className="animate-[hwDraw_0.45s_ease-out_0.35s_both]"
+        <main className="relative isolate flex min-h-[calc(100dvh-69px)] items-center overflow-hidden bg-[#120C0B]">
+          {/* Poster backdrop: blurred and darkened so the ticket stays the focus */}
+          <div className="pointer-events-none absolute inset-0 -z-10">
+            <Image
+              src={EVENT.poster}
+              alt=""
+              fill
+              priority
+              sizes="100vw"
+              className="scale-125 object-cover opacity-80 blur-2xl"
+            />
+            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(18,12,11,0.55)_0%,rgba(18,12,11,0.75)_55%,rgba(18,12,11,0.92)_100%)]" />
+            <div className="absolute left-1/2 top-[-120px] h-[340px] w-[560px] -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(229,37,27,0.35),transparent)]" />
+          </div>
+
+          <div className="relative mx-auto flex w-full max-w-[420px] flex-col items-center px-5 py-6 sm:py-12">
+            <div className="relative flex h-12 w-12 items-center justify-center">
+              <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.35s_both] rounded-full bg-[#E5251B]" />
+              <span className="hw-celebrate pointer-events-none absolute inset-0 animate-[hwRing_1.2s_ease-out_0.6s_both] rounded-full bg-[#E5251B]" />
+              {[
+                ["-130px", "-40px", "200deg", "#E5251B"],
+                ["-80px", "-70px", "-160deg", "#F5A623"],
+                ["-25px", "-80px", "240deg", "#FFFFFF"],
+                ["40px", "-75px", "-220deg", "#E5251B"],
+                ["95px", "-60px", "180deg", "#F5A623"],
+                ["140px", "-10px", "-200deg", "#FFFFFF"],
+                ["-140px", "20px", "260deg", "#F5A623"],
+                ["120px", "45px", "-240deg", "#E5251B"],
+                ["-95px", "55px", "220deg", "#FFFFFF"],
+                ["-40px", "70px", "-180deg", "#E5251B"],
+                ["50px", "75px", "200deg", "#F5A623"],
+                ["0px", "-95px", "300deg", "#E5251B"],
+              ].map(([dx, dy, rot, color], i) => (
+                <span
+                  key={i}
+                  className="hw-celebrate pointer-events-none absolute left-1/2 top-1/2 -ml-1 -mt-1.5 h-3 w-2 animate-[hwBurst_1.1s_cubic-bezier(.2,.8,.3,1)_both] rounded-[2px]"
+                  style={
+                    {
+                      "--dx": dx,
+                      "--dy": dy,
+                      "--rot": rot,
+                      backgroundColor: color,
+                      animationDelay: `${0.3 + (i % 4) * 0.03}s`,
+                    } as React.CSSProperties
+                  }
                 />
-              </svg>
+              ))}
+              <div className="relative flex h-12 w-12 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#E5251B] shadow-[0_0_0_6px_rgba(229,37,27,0.18)]">
+                <svg viewBox="0 0 24 24" className="h-6 w-6">
+                  <path
+                    d="M5 12.5l4.5 4.5L19 7.5"
+                    fill="none"
+                    stroke="#fff"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeDasharray="30"
+                    className="animate-[hwDraw_0.45s_ease-out_0.35s_both]"
+                  />
+                </svg>
+              </div>
             </div>
-          </div>
-          <h1 className="m-0 mt-7 animate-[hwUp_0.6s_ease-out_0.45s_both] text-[48px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[72px]">
-            You&apos;re in!
-          </h1>
-          <p className="mt-3.5 animate-[hwUp_0.6s_ease-out_0.6s_both] text-[17px] leading-relaxed text-[#6B6B6B]">
-            We&apos;ve received your payment details. Your ticket is below and in{" "}
-            <span className="font-medium text-[#141414]">My Tickets</span>.
-          </p>
+            <h1 className="m-0 mt-3.5 animate-[hwUp_0.6s_ease-out_0.45s_both] text-center text-[32px] font-black leading-none tracking-[-0.045em] text-white sm:text-[40px]">
+              You&apos;re in{firstName ? `, ${firstName}` : ""}!
+            </h1>
+            <p className="mt-1.5 animate-[hwUp_0.6s_ease-out_0.55s_both] text-center text-[13px] text-white/65 sm:text-sm">
+              Booking confirmed · saved to My Tickets
+            </p>
 
-          <div className="mt-6 flex w-full animate-[hwUp_0.6s_ease-out_0.75s_both] items-start gap-3 rounded-xl bg-[#FFF6E5] px-5 py-4 text-left text-sm leading-relaxed text-[#8A5A00]">
-            <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#D99A1E]" />
-            <span>
-              <span className="font-bold">Payment verification pending.</span> We&apos;ll match UPI
-              transaction <span className="font-bold tabular-nums">{upiTxnId}</span> with our
-              account. Your QR will work at the entrance once it&apos;s verified.
-            </span>
-          </div>
+            {/* Ticket */}
+            <div className="mt-5 w-full animate-[hwUp_0.7s_ease-out_0.7s_both] text-left drop-shadow-[0_24px_36px_rgba(0,0,0,0.5)] sm:mt-7">
+              <div className="overflow-hidden rounded-t-[22px] bg-white" style={notch("bottom")}>
+                <div className="relative h-[170px] overflow-hidden bg-[#141414] sm:h-[190px]">
+                  <Image
+                    src={EVENT.poster}
+                    alt={EVENT.posterAlt}
+                    fill
+                    priority
+                    sizes="420px"
+                    className="object-cover object-[center_40%]"
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(20,20,20,0.45)_0%,rgba(20,20,20,0)_30%,rgba(20,20,20,0.1)_55%,rgba(20,20,20,0.9)_100%)]" />
+                  <div className="absolute inset-x-4 top-4 flex items-center justify-between gap-2">
+                    <span className="rounded-full bg-black/35 px-2.5 py-1 text-[10px] font-bold tracking-[0.16em] text-white backdrop-blur-md">
+                      E-TICKET
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF6E5] px-2.5 py-1 text-[11px] font-bold text-[#8A5A00]">
+                      <span className="h-1.5 w-1.5 animate-[hwPulse_1.4s_ease_infinite] rounded-full bg-[#D99A1E]" />
+                      Verification pending
+                    </span>
+                  </div>
+                  <div className="absolute inset-x-4 bottom-3.5">
+                    <div className="text-[34px] font-black leading-[0.95] tracking-[-0.05em] text-white">
+                      {ticketResult.eventName ?? EVENT.name}
+                    </div>
+                    <div className="mt-1 text-[13px] font-bold tracking-[-0.01em] text-[#FF6A5F]">
+                      {EVENT.presenter}
+                    </div>
+                  </div>
+                </div>
 
-          <div className="mt-6 w-full animate-[hwUp_0.7s_ease-out_0.9s_both] overflow-hidden rounded-xl border border-[#EDE6E3] bg-white text-left">
-            <div className="px-7 py-6">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">E-TICKET</div>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFF6E5] px-2.5 py-0.5 text-xs font-bold text-[#8A5A00]">
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#D99A1E]" />
-                  Verification pending
-                </span>
-              </div>
-              <div className="mt-2 text-2xl font-black tracking-[-0.03em]">
-                {ticketResult.eventName}
-              </div>
-              {when && (
-                <div className="mt-1 text-sm text-[#6B6B6B]">
-                  {when}
-                  {ticketResult.venue ? ` · ${ticketResult.venue}` : ""}
-                </div>
-              )}
-              <div className="mt-[22px] grid grid-cols-2 gap-4 sm:grid-cols-3">
-                <div>
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
-                    ATTENDEE
-                  </div>
-                  <div className="mt-1 text-[15px] font-bold">{who}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
-                    TICKET
-                  </div>
-                  <div className="mt-1 text-[15px] font-bold">
-                    {ticketResult.tierName ?? selectedTier?.name}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">
-                    BOOKING ID
-                  </div>
-                  <div className="mt-1 text-[15px] font-bold tabular-nums">
-                    {ticketResult.ticketCode}
-                  </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 px-4 pb-5 pt-4 sm:px-5">
+                  {details.map((d) => (
+                    <div key={d.label} className="min-w-0">
+                      <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">
+                        {d.label}
+                      </div>
+                      <div className="mt-0.5 truncate text-[14px] font-bold leading-snug">
+                        {d.value}
+                      </div>
+                    </div>
+                  ))}
+                  <a
+                    href={EVENT.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="col-span-2 flex items-center justify-between gap-3 rounded-xl bg-[#FAF7F5] px-3 py-2.5"
+                  >
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="flex-none text-[#E5251B]">
+                        <path
+                          d="M12 21s-7-6.2-7-11.5A7 7 0 0112 2.5a7 7 0 017 7C19 14.8 12 21 12 21z"
+                          stroke="currentColor"
+                          strokeWidth="2"
+                        />
+                        <circle cx="12" cy="9.5" r="2.5" stroke="currentColor" strokeWidth="2" />
+                      </svg>
+                      <span className="truncate text-[13px] font-bold">{EVENT.venue}</span>
+                    </span>
+                    <span className="flex-none text-[12px] font-bold text-[#E5251B]">Directions →</span>
+                  </a>
                 </div>
               </div>
-            </div>
-            <div className="relative h-0 border-t border-dashed border-[#EDE6E3]">
-              <span className="absolute -left-[11px] -top-[11px] h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
-              <span className="absolute -right-[11px] -top-[11px] h-[22px] w-[22px] rounded-full border border-[#EDE6E3] bg-white" />
-            </div>
-            <div className="flex flex-wrap items-center gap-6 bg-[#FAF7F5] px-7 py-6">
-              <div className="flex h-[132px] w-[132px] items-center justify-center rounded-lg border border-[#EDE6E3] bg-white p-2.5">
-                <QRCodeSVG value={ticketResult.ticketCode} size={112} />
-              </div>
-              <div className="flex-1 basis-[200px] text-sm leading-relaxed text-[#6B6B6B]">
-                Show this code at the entrance. Keep your UPI payment screenshot handy in case
-                we need it.
-              </div>
-            </div>
-          </div>
 
-          <div className="mt-7 flex flex-wrap justify-center gap-3">
-            <button onClick={() => downloadIcs(event)} className={btn}>
-              Add to calendar
-            </button>
+              <div className="rounded-b-[22px] bg-white" style={notch("top")}>
+                <div className="mx-5 border-t-2 border-dashed border-[#EDE6E3]" />
+                <div className="flex items-center gap-4 px-4 pb-4 pt-4 sm:px-5">
+                  <div className="flex-none rounded-xl border border-[#EDE6E3] bg-white p-2">
+                    <QRCodeSVG value={ticketResult.ticketCode} size={112} className="h-[92px] w-[92px]" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-bold tracking-[0.14em] text-[#9A918D]">
+                      BOOKING ID
+                    </div>
+                    <div className="mt-0.5 font-mono text-[19px] font-bold tracking-[-0.02em] tabular-nums">
+                      {ticketResult.ticketCode}
+                    </div>
+                    <div className="mt-1.5 text-[12px] leading-snug text-[#6B6B6B]">
+                      Show at the gate. Activates once UPI ref{" "}
+                      <span className="font-bold tabular-nums text-[#141414]">{upiTxnId}</span> is
+                      verified.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid w-full animate-[hwUp_0.6s_ease-out_0.9s_both] grid-cols-2 gap-3 sm:mt-7">
+              <button onClick={() => downloadIcs(event)} className={`${btn} !h-12 !px-3 text-sm`}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <rect x="3.5" y="5" width="17" height="15.5" rx="2.5" stroke="currentColor" strokeWidth="2" />
+                  <path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+                Add to calendar
+              </button>
+              <Link
+                href="/dashboard"
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-full border border-white/35 bg-white/10 px-3 text-sm font-bold text-white backdrop-blur-md transition-colors hover:bg-white hover:text-[#141414]"
+              >
+                My Tickets →
+              </Link>
+            </div>
             <Link
-              href="/dashboard"
-              className="inline-flex h-[52px] items-center justify-center rounded-full border border-[#141414] px-7 text-[15px] font-bold transition-colors hover:bg-[#FAF7F5]"
+              href="/"
+              className="mt-4 text-[13px] font-bold text-white/60 hover:text-white"
             >
-              View in My Tickets
+              Back to event page
             </Link>
           </div>
-          <Link href="/" className="mt-7 text-sm font-bold text-[#6B6B6B]">
-            Back to event page
-          </Link>
         </main>
       </Page>
     );
@@ -842,18 +897,18 @@ export default function RegisterForm({
 
   return (
     <Page>
-      <main className="mx-auto max-w-[1200px] px-6 py-10 pb-24">
+      <main className="mx-auto max-w-[1200px] px-5 pb-10 pt-6 sm:px-6 sm:py-10 sm:pb-24">
         <div className="flex items-start gap-12">
           <div className="min-w-0 max-w-[720px] flex-1">
             <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">REGISTRATION</div>
-            <h1 className="m-0 mt-3 text-[36px] font-black leading-[1] tracking-[-0.045em] sm:text-[52px]">
+            <h1 className="m-0 mt-3 text-[34px] font-black leading-[1] tracking-[-0.045em] sm:text-[52px]">
               Get your ticket
             </h1>
 
-            <div className="mt-6 flex items-center gap-4 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-3 lg:hidden">
+            <div className="mt-5 flex items-center gap-3.5 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-3 sm:mt-6 sm:gap-4 lg:hidden">
               <EventThumb className="aspect-[4/5] w-16 flex-none" />
               <div className="min-w-0 text-sm leading-relaxed text-[#6B6B6B]">
-                <div className="text-base font-black tracking-[-0.02em] text-[#141414]">
+                <div className="text-[15px] font-black leading-tight tracking-[-0.02em] text-[#141414] sm:text-base">
                   {EVENT.name} · {EVENT.presenter}
                 </div>
                 {EVENT.dateLabel} · {EVENT.timeLabel}
@@ -862,20 +917,20 @@ export default function RegisterForm({
               </div>
             </div>
 
-            <div className="mt-8 h-[3px] overflow-hidden rounded-full bg-[#EDE6E3]">
+            <div className="mt-6 h-[3px] overflow-hidden rounded-full bg-[#EDE6E3] sm:mt-8">
               <div
                 className="h-full rounded-full bg-[#E5251B] transition-[width] duration-500 ease-out"
                 style={{ width: `${((Math.min(step, 2) + 1) / 3) * 100}%` }}
               />
             </div>
-            <div className="mt-3.5 flex flex-wrap gap-7">
+            <div className="mt-3 grid grid-cols-3 gap-2 sm:flex sm:gap-7">
               {steps.map((label, i) => (
                 <button
                   key={label}
                   onClick={() => i < step && go(i)}
                   disabled={i >= step}
                   style={{ cursor: i < step ? "pointer" : "default" }}
-                  className="flex gap-2 text-sm font-bold"
+                  className="flex flex-col items-start gap-0.5 py-1 text-sm font-bold sm:flex-row sm:gap-2 sm:py-0"
                 >
                   <span style={{ color: i <= step ? "#E5251B" : "#6B6B6B" }}>0{i + 1}</span>
                   <span style={{ color: i <= step ? "#141414" : "#6B6B6B" }}>{label}</span>
@@ -884,7 +939,7 @@ export default function RegisterForm({
             </div>
 
             {step === 0 && (
-              <section className="mt-10">
+              <section className="mt-7 sm:mt-10">
                 {invited && (
                   <div className="mb-6 flex items-start gap-3 rounded-xl bg-[#EEF4EF] px-5 py-4 text-sm leading-relaxed text-[#2F6B45]">
                     <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#3F8A5A]" />
@@ -895,20 +950,30 @@ export default function RegisterForm({
                     </span>
                   </div>
                 )}
-                <div className="mb-10 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6">
+                <div className="mb-8 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-5 sm:mb-10 sm:p-6">
                   <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">
                     {EVENT.tagline.toUpperCase()}
                   </div>
                   <div className="mt-3 space-y-3 text-[15px] leading-relaxed text-[#6B6B6B]">
-                    {EVENT.description.map((p) => (
-                      <p key={p} className="m-0">
+                    {EVENT.description.map((p, i) => (
+                      <p
+                        key={p}
+                        className={`m-0 ${i > 0 && !descOpen ? "hidden sm:block" : ""}`}
+                      >
                         {p}
                       </p>
                     ))}
                   </div>
-                  <div className="mt-4 text-sm font-bold text-[#141414]">{EVENT.gateNote}</div>
+                  <button
+                    type="button"
+                    onClick={() => setDescOpen((o) => !o)}
+                    className="mt-2 text-sm font-bold text-[#E5251B] sm:hidden"
+                  >
+                    {descOpen ? "Show less" : "Read more"}
+                  </button>
+                  <div className="mt-3 text-sm font-bold text-[#141414] sm:mt-4">{EVENT.gateNote}</div>
                 </div>
-                <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">
+                <h2 className="m-0 mb-5 text-[20px] font-bold tracking-[-0.02em] sm:mb-6 sm:text-[22px]">
                   Your details
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -925,7 +990,7 @@ export default function RegisterForm({
 
                 <div className="mt-5">
                   <div className="mb-2.5 text-sm font-bold text-[#6B6B6B]">Gender</div>
-                  <div className="flex gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:flex">
                     {(["male", "female"] as Gender[]).map((g) => (
                       <button
                         key={g}
@@ -935,7 +1000,7 @@ export default function RegisterForm({
                           borderColor: gender === g ? "#E5251B" : "#EDE6E3",
                           boxShadow: gender === g ? "0 0 0 1px #E5251B" : "none",
                         }}
-                        className="rounded-full border bg-white px-6 py-3 text-sm font-bold capitalize transition-transform duration-150 hover:-translate-y-0.5"
+                        className="h-12 rounded-full border bg-white px-6 text-sm font-bold capitalize transition-transform duration-150 hover:-translate-y-0.5"
                       >
                         {g}
                       </button>
@@ -948,12 +1013,12 @@ export default function RegisterForm({
                   )}
                 </div>
 
-                <div className="mt-8 flex justify-end">
+                <div className={`${actionBar} sm:justify-end`}>
                   <button
                     onClick={() =>
                       check(["fullName", "email", "mobile", "instagram", "age"]) && go(1)
                     }
-                    className={btn}
+                    className={`flex-1 sm:flex-none ${btn}`}
                   >
                     Continue to tickets →
                   </button>
@@ -962,8 +1027,8 @@ export default function RegisterForm({
             )}
 
             {step === 1 && (
-              <section className="mt-10">
-                <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">
+              <section className="mt-7 sm:mt-10">
+                <h2 className="m-0 mb-5 text-[20px] font-bold tracking-[-0.02em] sm:mb-6 sm:text-[22px]">
                   Choose a ticket
                 </h2>
                 {tiersLoading ? (
@@ -989,7 +1054,7 @@ export default function RegisterForm({
                             opacity: selectable ? 1 : 0.55,
                             cursor: selectable ? "pointer" : "not-allowed",
                           }}
-                          className="relative flex flex-col gap-1.5 rounded-xl border bg-white p-[22px] text-left transition-transform duration-200 enabled:hover:-translate-y-0.5"
+                          className="relative flex flex-col gap-1.5 rounded-xl border bg-white p-5 text-left transition-transform sm:p-[22px] duration-200 enabled:hover:-translate-y-0.5"
                         >
                           {on && selectable && (
                             <span className="absolute right-4 top-4 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#E5251B]">
@@ -1046,10 +1111,10 @@ export default function RegisterForm({
                   </div>
                 )}
 
-                <div className="mt-8 flex items-center justify-between gap-4">
+                <div className={actionBar}>
                   <button
                     onClick={() => go(step - 1)}
-                    className="text-[15px] font-bold text-[#6B6B6B] hover:text-[#141414]"
+                    className="h-12 flex-none pr-2 text-[15px] font-bold text-[#6B6B6B] hover:text-[#141414]"
                   >
                     ← Back
                   </button>
@@ -1057,12 +1122,12 @@ export default function RegisterForm({
                     <button
                       onClick={joinWaitlist}
                       disabled={joining || !selectedTier}
-                      className={`min-w-[200px] ${btn}`}
+                      className={`flex-1 sm:min-w-[200px] sm:flex-none ${btn}`}
                     >
                       {joining ? "Joining…" : "Join waitlist →"}
                     </button>
                   ) : (
-                    <button onClick={() => selectedTier && go(2)} disabled={!selectedTier} className={btn}>
+                    <button onClick={() => selectedTier && go(2)} disabled={!selectedTier} className={`flex-1 sm:flex-none ${btn}`}>
                       Continue to payment →
                     </button>
                   )}
@@ -1071,9 +1136,9 @@ export default function RegisterForm({
             )}
 
             {step === 2 && (
-              <section className="mt-10">
-                <h2 className="m-0 mb-6 text-[22px] font-bold tracking-[-0.02em]">Pay with UPI</h2>
-                <div className="rounded-xl border border-[#EDE6E3] p-5">
+              <section className="mt-7 sm:mt-10">
+                <h2 className="m-0 mb-5 text-[20px] font-bold tracking-[-0.02em] sm:mb-6 sm:text-[22px]">Pay with UPI</h2>
+                <div className="rounded-xl border border-[#EDE6E3] px-4 py-3.5 sm:p-5">
                   <div className="flex justify-between gap-3 text-[15px]">
                     <span>{selectedTier?.name}</span>
                     <span className="tabular-nums font-bold">{fmt(amount)}</span>
@@ -1081,38 +1146,47 @@ export default function RegisterForm({
                 </div>
 
                 {UPI_ID ? (
-                  <div className="mt-4 flex flex-col items-center gap-6 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6 sm:flex-row">
-                    <div className="flex-none rounded-xl border border-[#EDE6E3] bg-white p-3">
-                      <QRCodeSVG
-                        value={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
-                        size={184}
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1 text-center sm:text-left">
-                      <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
-                        SCAN &amp; PAY
+                  <div className="mt-4 flex flex-col items-stretch gap-5 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-5 sm:flex-row sm:items-center sm:gap-6 sm:p-6">
+                    <div className="order-2 flex flex-col items-center gap-2.5 sm:order-1">
+                      <div className="flex-none rounded-xl border border-[#EDE6E3] bg-white p-2 sm:p-3">
+                        <QRCodeSVG
+                          value={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
+                          size={184}
+                          className="h-[132px] w-[132px] sm:h-[184px] sm:w-[184px]"
+                        />
                       </div>
-                      <div className="mt-1 text-[32px] font-black tracking-[-0.03em] tabular-nums">
+                      <div className="text-xs text-[#6B6B6B] sm:hidden">
+                        Or scan from another device
+                      </div>
+                    </div>
+                    <div className="order-1 min-w-0 flex-1 text-center sm:order-2 sm:text-left">
+                      <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">
+                        PAY VIA UPI
+                      </div>
+                      <div className="mt-1 text-[36px] font-black leading-none tracking-[-0.03em] tabular-nums sm:text-[32px]">
                         {fmt(amount)}
                       </div>
-                      <div className="mt-1.5 text-sm leading-relaxed text-[#6B6B6B]">
-                        Scan with GPay, PhonePe, Paytm or any UPI app. Pay the exact amount, then
-                        enter the transaction ID below.
+                      <a
+                        href={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
+                        className="mt-4 flex h-12 w-full items-center justify-center rounded-full bg-[#141414] px-5 text-[15px] font-bold text-white sm:hidden"
+                      >
+                        Open UPI app
+                      </a>
+                      <div className="mt-3 text-sm leading-relaxed text-[#6B6B6B] sm:mt-1.5">
+                        <span className="sm:hidden">Pay the exact amount, then enter the ID below.</span>
+                        <span className="hidden sm:inline">
+                          Scan with GPay, PhonePe, Paytm or any UPI app. Pay the exact amount, then
+                          enter the transaction ID below.
+                        </span>
                       </div>
                       <button
                         type="button"
                         onClick={copyUpiId}
-                        className="mt-3.5 inline-flex max-w-full items-center gap-2 rounded-full border border-[#EDE6E3] bg-white px-4 py-2 text-sm"
+                        className="mt-3 inline-flex h-11 max-w-full items-center gap-2 rounded-full border border-[#EDE6E3] bg-white px-4 text-sm sm:mt-3.5"
                       >
                         <span className="truncate font-bold">{UPI_ID}</span>
                         <span className="text-[#E5251B]">{copied ? "Copied" : "Copy"}</span>
                       </button>
-                      <a
-                        href={upiLink(amount, `Heatwave ${selectedTier?.name ?? "ticket"}`)}
-                        className="mt-3 flex h-11 items-center justify-center rounded-full border border-[#141414] px-5 text-sm font-bold sm:hidden"
-                      >
-                        Open UPI app
-                      </a>
                     </div>
                   </div>
                 ) : (
@@ -1139,8 +1213,12 @@ export default function RegisterForm({
                   />
                   {!showTxnError && (
                     <div className="ml-1 mt-1.5 text-[13px] text-[#6B6B6B]">
-                      Find it as &ldquo;UPI transaction ID&rdquo; or &ldquo;UTR&rdquo; in your UPI
-                      app · {upiTxnId.length}/12
+                      <span className="hidden sm:inline">
+                        Find it as &ldquo;UPI transaction ID&rdquo; or &ldquo;UTR&rdquo; in your UPI
+                        app ·{" "}
+                      </span>
+                      <span className="sm:hidden">UTR from your UPI app · </span>
+                      {upiTxnId.length}/12
                     </div>
                   )}
                 </div>
@@ -1149,7 +1227,7 @@ export default function RegisterForm({
                   <label
                     htmlFor="hw-screenshot"
                     style={{ borderColor: proofError || proofMissing ? "#E5251B" : "#EDE6E3" }}
-                    className="flex cursor-pointer items-center gap-4 rounded-xl border border-dashed bg-white p-4 transition-colors hover:bg-[#FCFAF9]"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed bg-white px-3.5 py-3 sm:gap-4 sm:p-4 transition-colors hover:bg-[#FCFAF9]"
                   >
                     {proofPreview ? (
                       <Image
@@ -1158,10 +1236,10 @@ export default function RegisterForm({
                         width={56}
                         height={56}
                         unoptimized
-                        className="h-14 w-14 flex-none rounded-lg border border-[#EDE6E3] object-cover"
+                        className="h-11 w-11 flex-none rounded-lg border border-[#EDE6E3] object-cover sm:h-14 sm:w-14"
                       />
                     ) : (
-                      <span className="flex h-14 w-14 flex-none items-center justify-center rounded-lg bg-[#FAF7F5] text-[#6B6B6B]">
+                      <span className="flex h-11 w-11 flex-none items-center justify-center rounded-lg bg-[#FAF7F5] sm:h-14 sm:w-14 text-[#6B6B6B]">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
                           <path
                             d="M12 16V4m0 0l-4.5 4.5M12 4l4.5 4.5M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"
@@ -1174,11 +1252,16 @@ export default function RegisterForm({
                       </span>
                     )}
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-bold">
+                      <span className="block truncate text-sm font-bold sm:text-[15px]">
                         {compressing ? "Compressing…" : proof ? proof.name : "Upload payment screenshot"}
                       </span>
-                      <span className="block text-[13px] text-[#6B6B6B]">
-                        {proofNote || "PNG, JPG, WEBP or HEIC · up to 15 MB · compressed automatically"}
+                      <span className="block truncate text-xs text-[#6B6B6B] sm:text-[13px]">
+                        {proofNote || (
+                          <>
+                            <span className="sm:hidden">Image · max 15 MB</span>
+                            <span className="hidden sm:inline">PNG, JPG, WEBP or HEIC · up to 15 MB</span>
+                          </>
+                        )}
                       </span>
                     </span>
                     <span className="flex-none text-sm font-bold text-[#E5251B]">
@@ -1206,17 +1289,17 @@ export default function RegisterForm({
                   </div>
                 )}
 
-                <div className="mt-8 flex items-center justify-between gap-4">
+                <div className={actionBar}>
                   <button
                     onClick={() => go(step - 1)}
-                    className="text-[15px] font-bold text-[#6B6B6B] hover:text-[#141414]"
+                    className="h-12 flex-none pr-2 text-[15px] font-bold text-[#6B6B6B] hover:text-[#141414]"
                   >
                     ← Back
                   </button>
                   <button
                     onClick={handleSubmit}
                     disabled={submitting || compressing || !UPI_ID}
-                    className={`min-w-[200px] justify-center ${btn}`}
+                    className={`flex-1 justify-center sm:min-w-[200px] sm:flex-none ${btn}`}
                   >
                     {submitting ? (
                       <>
@@ -1228,9 +1311,11 @@ export default function RegisterForm({
                     )}
                   </button>
                 </div>
-                <div className="mt-4 text-right text-[13px] text-[#6B6B6B]">
-                  Your ticket is issued right away and activates once we verify the payment · By
-                  continuing, you agree to our{" "}
+                <div className="mt-4 pb-2 text-[13px] leading-relaxed text-[#6B6B6B] sm:text-right">
+                  <span className="hidden sm:inline">
+                    Your ticket is issued right away and activates once we verify the payment ·{" "}
+                  </span>
+                  By continuing, you agree to our{" "}
                   <Link href="/terms" className="font-bold text-[#141414] underline">
                     Terms
                   </Link>{" "}
@@ -1277,8 +1362,8 @@ function Page({ children }: { children: ReactNode }) {
       className="min-h-screen bg-white text-[#141414]"
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
-      <header className="border-b border-[#EDE6E3]">
-        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-6 py-[18px]">
+      <header className="sticky top-0 z-20 border-b border-[#EDE6E3] bg-white">
+        <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-6 px-5 py-3.5 sm:px-6 sm:py-[18px]">
           <Link
             href="/"
             className="flex items-center gap-1.5 text-xl font-black tracking-[-0.04em]"
@@ -1286,7 +1371,7 @@ function Page({ children }: { children: ReactNode }) {
             heatwave
             <span className="h-[7px] w-[7px] rounded-full bg-[#E5251B]" />
           </Link>
-          <Link href="/" className="text-sm font-medium text-[#6B6B6B] hover:text-[#141414]">
+          <Link href="/" className="flex h-10 items-center text-sm font-medium text-[#6B6B6B] hover:text-[#141414]">
             ← Back to event
           </Link>
         </div>
