@@ -69,7 +69,7 @@ const HIGHLIGHTS = [
 const FAQS = [
   {
     q: "When should I arrive?",
-    a: "Gate closes at 7:00 PM sharp on Saturday, 12 December, so plan to reach Muthukadu Boat House before then.",
+    a: "Boarding closes at 7:30 PM sharp on Saturday, 12 December, so plan to reach Muthukadu Boat House before then.",
   },
   {
     q: "What's happening onboard?",

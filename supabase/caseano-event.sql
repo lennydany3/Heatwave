@@ -9,5 +9,5 @@
 update public.events
 set name      = 'Caseano',
     venue     = 'Muthukadu Boat House, ECR',
-    starts_at = '2026-12-12T19:00:00+05:30'
+    starts_at = '2026-12-12T20:00:00+05:30'
 where slug = 'product-builders-summit-2027';
