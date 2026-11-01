@@ -4,10 +4,10 @@ import { EVENT } from "@/lib/event";
 import { requireAccess, type Access } from "../_lib/auth";
 
 const TICKET_SELECT =
-  "id, ticket_code, status, checked_in_at, registrations(full_name, email, status, verification_note, upi_txn_id, ticket_tiers(name))";
+  "id, ticket_code, status, checked_in_at, registrations(full_name, email, mobile, gender, age, status, verification_note, upi_txn_id, ticket_tiers(name))";
 
 type Ticket = {
-  registrations: { email: string; upi_txn_id: string | null } | null;
+  registrations: { email: string; mobile: string | null; upi_txn_id: string | null } | null;
 } & Record<string, unknown>;
 
 function mask(access: Access, t: Ticket): Ticket {
@@ -17,6 +17,7 @@ function mask(access: Access, t: Ticket): Ticket {
     registrations: {
       ...t.registrations,
       email: access.masked("checkin", "contact") ? "Hidden" : t.registrations.email,
+      mobile: access.masked("checkin", "contact") ? "Hidden" : t.registrations.mobile,
       upi_txn_id: access.masked("checkin", "payment") ? null : t.registrations.upi_txn_id,
     },
   };
