@@ -3,7 +3,7 @@
 import jsQR from "jsqr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
-import { Avatar, Empty, PageHeader, Panel, PanelHead, Pill, RED_BUTTON, Toast } from "../_components/ui";
+import { Avatar, Empty, PageHeader, Panel, PanelHead, Pill, Sheet, Toast } from "../_components/ui";
 
 type EventInfo = { id: string; name: string; venue: string | null; starts_at: string | null };
 
@@ -17,6 +17,9 @@ type TicketRow = {
   registrations: {
     full_name: string;
     email: string;
+    mobile: string | null;
+    gender: string | null;
+    age: number | null;
     status: PaymentStatus;
     verification_note: string | null;
     upi_txn_id: string | null;
@@ -32,6 +35,14 @@ type LookupResult =
   | { kind: "payment-failed"; ticket: TicketRow }
   | { kind: "ready"; ticket: TicketRow };
 
+// The browser's built-in QR reader (Chrome / Android). Much faster and more reliable
+// than jsQR, which stays as the fallback for browsers without it (e.g. iOS Safari).
+type QrDetector = { detect: (source: CanvasImageSource) => Promise<{ rawValue: string }[]> };
+type QrDetectorClass = {
+  new (options: { formats: string[] }): QrDetector;
+  getSupportedFormats?: () => Promise<string[]>;
+};
+
 const isVerified = (t: TicketRow) => t.registrations?.status === "paid";
 
 function classify(ticket: TicketRow): LookupResult {
@@ -44,8 +55,51 @@ function classify(ticket: TicketRow): LookupResult {
   return { kind: "ready", ticket };
 }
 
+// Ticket QRs hold the bare booking ID, but accept a link or text that contains one.
+function extractCode(raw: string) {
+  return raw.match(/HW-\d+-\d+/i)?.[0] ?? raw;
+}
+
+async function createDetector(): Promise<QrDetector | null> {
+  const Detector = (window as unknown as { BarcodeDetector?: QrDetectorClass }).BarcodeDetector;
+  if (!Detector) return null;
+  try {
+    const formats = await Detector.getSupportedFormats?.();
+    if (formats && !formats.includes("qr_code")) return null;
+    return new Detector({ formats: ["qr_code"] });
+  } catch {
+    return null;
+  }
+}
+
+const time = (iso: string) =>
+  new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+
 const C = 2 * Math.PI * 52;
 const SCAN_DEBOUNCE_MS = 2500;
+const SCAN_INTERVAL_MS = 120;
+// Frames are scaled down to this before jsQR decodes them; full camera resolution is too slow on phones.
+const DECODE_SIZE = 720;
+
+// Look of the result popup for each outcome: header colour, title and whether to admit.
+const RESULT_STYLE: Record<LookupResult["kind"], { bg: string; title: string; admit: boolean }> = {
+  ready: { bg: "#2F6B45", title: "Valid ticket", admit: true },
+  already: { bg: "#141414", title: "Already checked in", admit: false },
+  "payment-pending": { bg: "#8A5A00", title: "Do not admit · payment pending", admit: false },
+  "payment-failed": { bg: "#B71C14", title: "Do not admit · payment failed", admit: false },
+  cancelled: { bg: "#B71C14", title: "Do not admit · ticket cancelled", admit: false },
+  "not-found": { bg: "#B71C14", title: "Ticket not found", admit: false },
+};
+
+function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
+  if (!value) return null;
+  return (
+    <div className="flex items-start justify-between gap-4 border-t border-[#EDE6E3] py-2.5 text-sm first:border-t-0">
+      <span className="flex-none text-[#6B6B6B]">{label}</span>
+      <span className="min-w-0 break-words text-right font-bold">{value}</span>
+    </div>
+  );
+}
 
 export default function AdminCheckInPage() {
   const [q, setQ] = useState("");
@@ -59,14 +113,22 @@ export default function AdminCheckInPage() {
 
   const [manualCode, setManualCode] = useState("");
   const [lookup, setLookup] = useState<LookupResult | null>(null);
+  const [lookingUp, setLookingUp] = useState<string | null>(null);
   const [approving, setApproving] = useState(false);
 
   const [scanning, setScanning] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [torchSupported, setTorchSupported] = useState(false);
+  const [torchOn, setTorchOn] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
+  const loopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const liveRef = useRef(false);
+  // True while the result popup is open, so the camera doesn't fire more lookups behind it.
+  const pausedRef = useRef(false);
+  const detectorRef = useRef<QrDetector | null>(null);
+  const cropRef = useRef(false);
   const lastScanRef = useRef<{ code: string; at: number } | null>(null);
 
   function showToast(msg: string) {
@@ -114,106 +176,177 @@ export default function AdminCheckInPage() {
   }, [tickets, q]);
 
   // Always reads the ticket fresh from the database: payment verification
-  // happens on another page/device, so the cached list can be stale. This
-  // also keeps the camera loop (which captures doLookup once) up to date.
+  // happens on another page/device, so the cached list can be stale.
   const doLookup = useCallback(async (rawCode: string) => {
-    const code = rawCode.trim().toUpperCase();
+    const code = extractCode(rawCode.trim()).toUpperCase();
     if (!code) return;
+    pausedRef.current = true;
+    setLookup(null);
+    setLookingUp(code);
     const res = await fetch(`/api/admin/checkin?code=${encodeURIComponent(code)}`, {
       cache: "no-store",
-    });
-    const data = await res.json().catch(() => null);
-    const ticket = res.ok ? (data?.ticket as TicketRow | null) : null;
+    }).catch(() => null);
+    const data = res ? await res.json().catch(() => null) : null;
+    const ticket = res?.ok ? (data?.ticket as TicketRow | null) : null;
+    setLookingUp(null);
     setLookup(ticket ? classify(ticket) : { kind: "not-found", code });
   }, []);
 
+  function closeResult() {
+    setLookup(null);
+    setLookingUp(null);
+    // Give the scanner a moment so the same QR still in view doesn't reopen the popup instantly.
+    // Runs from a click handler, never during render.
+    // eslint-disable-next-line react-hooks/purity
+    if (lastScanRef.current) lastScanRef.current.at = Date.now();
+    pausedRef.current = false;
+  }
+
   function stopCamera() {
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = null;
+    liveRef.current = false;
+    if (loopRef.current) clearTimeout(loopRef.current);
+    loopRef.current = null;
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     setScanning(false);
+    setTorchOn(false);
+    setTorchSupported(false);
   }
 
   async function startCamera() {
     setCameraError("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: "environment" } },
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+        },
       });
       streamRef.current = stream;
+      const track = stream.getVideoTracks()[0];
+      const caps = (track?.getCapabilities?.() ?? {}) as { focusMode?: string[]; torch?: boolean };
+      if (caps.focusMode?.includes("continuous")) {
+        track
+          .applyConstraints({ advanced: [{ focusMode: "continuous" } as unknown as MediaTrackConstraintSet] })
+          .catch(() => {});
+      }
+      setTorchSupported(!!caps.torch);
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
       }
+      detectorRef.current = await createDetector();
+      liveRef.current = true;
+      pausedRef.current = false;
       setScanning(true);
-      tick();
+      scanLoop();
     } catch {
       setCameraError("Couldn't access the camera. Check permissions, or use the code field below.");
     }
   }
 
-  function tick() {
+  async function toggleTorch() {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({ advanced: [{ torch: next } as unknown as MediaTrackConstraintSet] });
+      setTorchOn(next);
+    } catch {
+      setTorchSupported(false);
+    }
+  }
+
+  async function readFrame(): Promise<string | null> {
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    if (video && canvas && video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const code = jsQR(frame.data, frame.width, frame.height);
-        if (code?.data) {
-          // This runs inside a requestAnimationFrame loop driven by the camera
-          // stream (started from a click handler), never during React render.
-          // eslint-disable-next-line react-hooks/purity
-          const now = Date.now();
-          const last = lastScanRef.current;
-          if (!last || last.code !== code.data || now - last.at > SCAN_DEBOUNCE_MS) {
-            lastScanRef.current = { code: code.data, at: now };
-            doLookup(code.data);
-          }
+    if (!video || !canvas || video.readyState < video.HAVE_CURRENT_DATA || !video.videoWidth) return null;
+
+    if (detectorRef.current) {
+      try {
+        const found = await detectorRef.current.detect(video);
+        return found[0]?.rawValue ?? null;
+      } catch {
+        detectorRef.current = null; // fall back to jsQR from the next frame
+        return null;
+      }
+    }
+
+    // jsQR: alternate between the square under the guide frame (zoomed in, for small
+    // or distant codes) and the whole frame, both scaled down so each pass stays fast.
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+    cropRef.current = !cropRef.current;
+    const side = Math.min(vw, vh) * (cropRef.current ? 0.7 : 1);
+    const sw = cropRef.current ? side : vw;
+    const sh = cropRef.current ? side : vh;
+    const sx = (vw - sw) / 2;
+    const sy = (vh - sh) / 2;
+    const scale = Math.min(1, DECODE_SIZE / Math.max(sw, sh));
+    const w = Math.round(sw * scale);
+    const h = Math.round(sh * scale);
+    if (canvas.width !== w) canvas.width = w;
+    if (canvas.height !== h) canvas.height = h;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return null;
+    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, w, h);
+    const frame = ctx.getImageData(0, 0, w, h);
+    return jsQR(frame.data, w, h, { inversionAttempts: "dontInvert" })?.data ?? null;
+  }
+
+  async function scanLoop() {
+    if (!liveRef.current) return;
+    if (!pausedRef.current) {
+      const raw = await readFrame();
+      if (raw && liveRef.current && !pausedRef.current) {
+        // This loop is driven by the camera stream (started from a click), never during render.
+        // eslint-disable-next-line react-hooks/purity
+        const now = Date.now();
+        const last = lastScanRef.current;
+        if (!last || last.code !== raw || now - last.at > SCAN_DEBOUNCE_MS) {
+          lastScanRef.current = { code: raw, at: now };
+          navigator.vibrate?.(80);
+          doLookup(raw);
         }
       }
     }
-    rafRef.current = requestAnimationFrame(tick);
+    if (liveRef.current) loopRef.current = setTimeout(scanLoop, SCAN_INTERVAL_MS);
   }
 
   useEffect(() => stopCamera, []);
 
-  async function approve() {
-    if (!lookup || lookup.kind !== "ready" || approving || !event) return;
-    setApproving(true);
-    const res = await fetch("/api/admin/checkin", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ticketId: lookup.ticket.id }),
-    });
-    setApproving(false);
-    if (!res.ok) {
-      showToast("Couldn't check in — try again");
-      return;
-    }
-    showToast((lookup.ticket.registrations?.full_name ?? "Attendee") + " checked in");
-    setLookup(null);
-    setManualCode("");
-    load();
-  }
-
-  async function handleCheckIn(t: TicketRow) {
-    if (t.status !== "valid" || !isVerified(t)) return;
+  async function checkIn(t: TicketRow) {
     const res = await fetch("/api/admin/checkin", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ ticketId: t.id }),
     });
+    const data = await res.json().catch(() => null);
     if (!res.ok) {
-      showToast("Couldn't check in — try again");
-      return;
+      showToast(data?.error ?? "Couldn't check in — try again");
+      return false;
     }
     showToast((t.registrations?.full_name ?? "Attendee") + " checked in");
     load();
+    return true;
+  }
+
+  async function approve() {
+    if (!lookup || lookup.kind !== "ready" || approving) return;
+    setApproving(true);
+    const ok = await checkIn(lookup.ticket);
+    setApproving(false);
+    if (ok) {
+      navigator.vibrate?.([40, 60, 40]);
+      setManualCode("");
+      closeResult();
+    }
+  }
+
+  async function handleCheckIn(t: TicketRow) {
+    if (t.status !== "valid" || !isVerified(t)) return;
+    await checkIn(t);
   }
 
   function exportCsv() {
@@ -240,6 +373,10 @@ export default function AdminCheckInPage() {
     el.click();
     showToast("Exported " + (rows.length - 1) + " attendees");
   }
+
+  const resultTicket = lookup && lookup.kind !== "not-found" ? lookup.ticket : null;
+  const reg = resultTicket?.registrations;
+  const resultStyle = lookup ? RESULT_STYLE[lookup.kind] : null;
 
   return (
     <AdminShell active="checkin" search={q} onSearchChange={setQ}>
@@ -320,15 +457,28 @@ export default function AdminCheckInPage() {
           </div>
 
           <Panel className="p-3 sm:p-5">
-            <div className="flex items-center justify-between px-1 pt-1 sm:px-0 sm:pt-0">
+            <div className="flex items-center justify-between gap-2 px-1 pt-1 sm:px-0 sm:pt-0">
               <div className="text-[16px] font-bold sm:text-[17px]">Scan tickets</div>
               {scanning && (
-                <button
-                  onClick={stopCamera}
-                  className="h-8 rounded-full bg-[#F3EEEB] px-3.5 text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
-                >
-                  Stop
-                </button>
+                <div className="flex gap-1.5">
+                  {torchSupported && (
+                    <button
+                      onClick={toggleTorch}
+                      aria-pressed={torchOn}
+                      className={`h-8 rounded-full px-3.5 text-[13px] font-bold transition-colors ${
+                        torchOn ? "bg-[#FFD84D] text-[#141414]" : "bg-[#F3EEEB] text-[#6B6B6B]"
+                      }`}
+                    >
+                      {torchOn ? "Torch on" : "Torch"}
+                    </button>
+                  )}
+                  <button
+                    onClick={stopCamera}
+                    className="h-8 rounded-full bg-[#F3EEEB] px-3.5 text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414]"
+                  >
+                    Stop
+                  </button>
+                </div>
               )}
             </div>
             <div className="relative mt-3 aspect-square overflow-hidden rounded-2xl bg-[#141414] sm:mt-3.5">
@@ -342,12 +492,15 @@ export default function AdminCheckInPage() {
               <canvas ref={canvasRef} className="hidden" />
               {scanning && (
                 <>
-                  <div className="pointer-events-none absolute inset-[18%] rounded-2xl shadow-[0_0_0_999px_rgba(20,20,20,.5)]" />
-                  <span className="pointer-events-none absolute left-[16%] top-[16%] h-8 w-8 rounded-tl-xl border-l-[3px] border-t-[3px] border-white" />
-                  <span className="pointer-events-none absolute right-[16%] top-[16%] h-8 w-8 rounded-tr-xl border-r-[3px] border-t-[3px] border-white" />
-                  <span className="pointer-events-none absolute bottom-[16%] left-[16%] h-8 w-8 rounded-bl-xl border-b-[3px] border-l-[3px] border-white" />
-                  <span className="pointer-events-none absolute bottom-[16%] right-[16%] h-8 w-8 rounded-br-xl border-b-[3px] border-r-[3px] border-white" />
+                  <div className="pointer-events-none absolute inset-[15%] rounded-2xl shadow-[0_0_0_999px_rgba(20,20,20,.5)]" />
+                  <span className="pointer-events-none absolute left-[13%] top-[13%] h-8 w-8 rounded-tl-xl border-l-[3px] border-t-[3px] border-white" />
+                  <span className="pointer-events-none absolute right-[13%] top-[13%] h-8 w-8 rounded-tr-xl border-r-[3px] border-t-[3px] border-white" />
+                  <span className="pointer-events-none absolute bottom-[13%] left-[13%] h-8 w-8 rounded-bl-xl border-b-[3px] border-l-[3px] border-white" />
+                  <span className="pointer-events-none absolute bottom-[13%] right-[13%] h-8 w-8 rounded-br-xl border-b-[3px] border-r-[3px] border-white" />
                   <div className="pointer-events-none absolute left-[12%] right-[12%] h-0.5 animate-[hwScan_2.4s_ease-in-out_infinite_alternate] rounded-sm bg-[#E5251B] shadow-[0_0_14px_rgba(229,37,27,.8)]" />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-3 text-center text-[12px] font-bold text-white/80">
+                    Fit the QR code inside the frame
+                  </div>
                 </>
               )}
               {!scanning && (
@@ -390,115 +543,6 @@ export default function AdminCheckInPage() {
                 Look up
               </button>
             </div>
-
-            {lookup && (
-              <div
-                className="mt-3 animate-[hwUp_0.25s_ease_both] rounded-2xl border p-4"
-                style={{
-                  background:
-                    lookup.kind === "ready"
-                      ? "#EEF4EF"
-                      : lookup.kind === "already"
-                        ? "#FAF7F5"
-                        : lookup.kind === "payment-pending"
-                          ? "#FFF6E5"
-                          : "#FDECEA",
-                  borderColor:
-                    lookup.kind === "ready"
-                      ? "#CFE3D4"
-                      : lookup.kind === "already"
-                        ? "#EDE6E3"
-                        : lookup.kind === "payment-pending"
-                          ? "#F2DDB0"
-                          : "#F3C9C5",
-                }}
-              >
-                {lookup.kind === "not-found" && (
-                  <>
-                    <div className="text-[16px] font-bold text-[#B71C14]">Ticket not found</div>
-                    <div className="mt-1 text-[13px] text-[#6B6B6B]">{lookup.code}</div>
-                  </>
-                )}
-                {lookup.kind === "cancelled" && (
-                  <>
-                    <div className="text-[16px] font-bold text-[#B71C14]">
-                      {lookup.ticket.registrations?.full_name ?? lookup.ticket.ticket_code}
-                    </div>
-                    <div className="mt-1 text-[13px] text-[#6B6B6B]">This ticket was cancelled</div>
-                  </>
-                )}
-                {lookup.kind === "payment-pending" && (
-                  <>
-                    <div className="flex items-center gap-2 text-[15px] font-bold text-[#8A5A00]">
-                      <span className="h-2 w-2 flex-none rounded-full bg-[#D99A1E]" />
-                      Payment verification pending — do not admit
-                    </div>
-                    <div className="mt-1 text-[13px] text-[#141414]">
-                      {lookup.ticket.registrations?.full_name} · {lookup.ticket.ticket_code}
-                    </div>
-                    <div className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[13px] text-[#8A5A00]">
-                      <span className="font-bold">Reason:</span>{" "}
-                      {lookup.ticket.registrations?.verification_note || "Payment hasn't been verified yet"}
-                    </div>
-                  </>
-                )}
-                {lookup.kind === "payment-failed" && (
-                  <>
-                    <div className="flex items-center gap-2 text-[15px] font-bold text-[#B71C14]">
-                      <span className="h-2 w-2 flex-none rounded-full bg-[#E5251B]" />
-                      Payment failed — do not admit
-                    </div>
-                    <div className="mt-1 text-[13px] text-[#141414]">
-                      {lookup.ticket.registrations?.full_name} · {lookup.ticket.ticket_code}
-                    </div>
-                    <div className="mt-2.5 rounded-xl bg-white/70 px-3 py-2 text-[13px] text-[#B71C14]">
-                      <span className="font-bold">Reason:</span>{" "}
-                      {lookup.ticket.registrations?.verification_note || "Payment was rejected"}
-                    </div>
-                  </>
-                )}
-                {lookup.kind === "already" && (
-                  <>
-                    <div className="text-[16px] font-bold text-[#141414]">
-                      {lookup.ticket.registrations?.full_name ?? lookup.ticket.ticket_code}
-                    </div>
-                    <div className="mt-1 text-[13px] text-[#6B6B6B]">
-                      Already checked in
-                      {lookup.ticket.checked_in_at &&
-                        " at " +
-                          new Date(lookup.ticket.checked_in_at).toLocaleTimeString("en-IN", {
-                            hour: "numeric",
-                            minute: "2-digit",
-                          })}
-                    </div>
-                  </>
-                )}
-                {lookup.kind === "ready" && (
-                  <>
-                    <div className="flex items-center gap-2 text-[16px] font-bold text-[#2F6B45]">
-                      <span className="h-2 w-2 flex-none rounded-full bg-[#3F8A5A]" />
-                      {lookup.ticket.registrations?.full_name}
-                    </div>
-                    <div className="mt-1 text-[13px] text-[#6B6B6B]">
-                      {lookup.ticket.registrations?.ticket_tiers?.name} · {lookup.ticket.ticket_code}
-                    </div>
-                    {has("approve") ? (
-                      <div className="mt-3 rounded-full border border-[#EDE6E3] bg-white px-4 py-2 text-center text-xs font-bold text-[#6B6B6B]">
-                        View only — you can&apos;t check people in
-                      </div>
-                    ) : (
-                      <button
-                        onClick={approve}
-                        disabled={approving}
-                        className={`mt-3 flex h-12 w-full items-center justify-center rounded-full text-[15px] font-bold disabled:opacity-60 ${RED_BUTTON}`}
-                      >
-                        {approving ? "Approving…" : "Approve check-in"}
-                      </button>
-                    )}
-                  </>
-                )}
-              </div>
-            )}
           </Panel>
         </div>
 
@@ -550,6 +594,145 @@ export default function AdminCheckInPage() {
           )}
         </Panel>
       </div>
+
+      {lookingUp && (
+        <Sheet onClose={closeResult} labelledBy="scan-result-title" width={440}>
+          <div className="flex flex-col items-center px-6 pb-10 pt-12 text-center">
+            <span className="h-10 w-10 animate-[hwSpin_0.8s_linear_infinite] rounded-full border-[3px] border-[#F3EEEB] border-t-[#E5251B]" />
+            <div id="scan-result-title" className="mt-4 text-[16px] font-bold">
+              Checking ticket…
+            </div>
+            <div className="mt-1 text-sm tabular-nums text-[#6B6B6B]">{lookingUp}</div>
+          </div>
+        </Sheet>
+      )}
+
+      {lookup && resultStyle && (
+        <Sheet onClose={closeResult} labelledBy="scan-result-title" alert={!resultStyle.admit} width={440}>
+          <div
+            className="relative overflow-hidden px-6 pb-5 pt-7 text-white sm:pt-5"
+            style={{ background: resultStyle.bg }}
+          >
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-12 -top-14 h-40 w-40 rounded-full bg-white/15 blur-3xl"
+            />
+            <div className="relative flex items-center gap-3">
+              <span className="flex h-11 w-11 flex-none items-center justify-center rounded-full bg-white/15">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6" aria-hidden>
+                  {resultStyle.admit ? (
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  ) : lookup.kind === "already" ? (
+                    <path d="M12 7v5l3 2M12 21a9 9 0 110-18 9 9 0 010 18z" />
+                  ) : (
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  )}
+                </svg>
+              </span>
+              <div className="min-w-0">
+                <div id="scan-result-title" className="text-[18px] font-black leading-tight tracking-[-0.01em]">
+                  {resultStyle.title}
+                </div>
+                <div className="mt-0.5 text-[13px] tabular-nums text-white/75">
+                  {lookup.kind === "not-found" ? lookup.code : lookup.ticket.ticket_code}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-6 py-5">
+            {lookup.kind === "not-found" ? (
+              <p className="m-0 text-[15px] leading-relaxed text-[#6B6B6B]">
+                No ticket matches this code. Ask for the booking ID from their ticket and type it in, or
+                check their ticket in My Tickets.
+              </p>
+            ) : (
+              <>
+                <div className="flex items-center gap-3.5">
+                  <Avatar name={reg?.full_name ?? "?"} size={52} dark />
+                  <div className="min-w-0">
+                    <div className="truncate text-[20px] font-black tracking-[-0.02em]">
+                      {reg?.full_name ?? "Unknown attendee"}
+                    </div>
+                    <div className="text-[13px] text-[#6B6B6B]">{reg?.ticket_tiers?.name ?? "Ticket"}</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-2xl bg-[#FAF7F5] px-4 py-1">
+                  <DetailRow
+                    label="Gender"
+                    value={reg?.gender ? reg.gender[0].toUpperCase() + reg.gender.slice(1) : null}
+                  />
+                  <DetailRow label="Age" value={reg?.age != null ? String(reg.age) : null} />
+                  <DetailRow label="Mobile" value={reg?.mobile} />
+                  <DetailRow label="Email" value={reg?.email} />
+                  <DetailRow label="UPI txn ID" value={reg?.upi_txn_id} />
+                  <DetailRow
+                    label="Payment"
+                    value={
+                      reg?.status === "paid"
+                        ? "Verified"
+                        : reg?.status === "failed"
+                          ? "Failed"
+                          : reg?.status === "cancelled"
+                            ? "Cancelled"
+                            : "Not verified yet"
+                    }
+                  />
+                  {lookup.kind === "already" && lookup.ticket.checked_in_at && (
+                    <DetailRow label="Checked in at" value={time(lookup.ticket.checked_in_at)} />
+                  )}
+                </div>
+
+                {(lookup.kind === "payment-pending" || lookup.kind === "payment-failed") && (
+                  <div
+                    className="mt-3 rounded-xl px-3.5 py-2.5 text-[13px]"
+                    style={
+                      lookup.kind === "payment-pending"
+                        ? { background: "#FFF6E5", color: "#8A5A00" }
+                        : { background: "#FDECEA", color: "#B71C14" }
+                    }
+                  >
+                    <span className="font-bold">Reason:</span>{" "}
+                    {reg?.verification_note ||
+                      (lookup.kind === "payment-pending"
+                        ? "Payment hasn't been verified yet"
+                        : "Payment was rejected")}
+                  </div>
+                )}
+              </>
+            )}
+
+            {lookup.kind === "ready" && has("approve") && (
+              <div className="mt-4 rounded-full border border-[#EDE6E3] px-4 py-2.5 text-center text-xs font-bold text-[#6B6B6B]">
+                View only — you can&apos;t check people in
+              </div>
+            )}
+
+            <div className="mt-5 flex flex-col gap-2.5">
+              {lookup.kind === "ready" && !has("approve") && (
+                <button
+                  onClick={approve}
+                  disabled={approving}
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-[#2F6B45] text-[16px] font-bold text-white shadow-[0_10px_24px_-10px_rgba(47,107,69,.9)] transition active:scale-[.98] disabled:opacity-60"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5" aria-hidden>
+                    <path d="M5 12.5l4.5 4.5L19 7.5" />
+                  </svg>
+                  {approving ? "Approving…" : "Approve check-in"}
+                </button>
+              )}
+              <button
+                onClick={closeResult}
+                disabled={approving}
+                className="h-12 w-full rounded-full border border-[#EDE6E3] text-sm font-bold disabled:opacity-50"
+              >
+                {lookup.kind === "ready" && !has("approve") ? "Cancel" : scanning ? "Scan next" : "Close"}
+              </button>
+            </div>
+          </div>
+        </Sheet>
+      )}
 
       <Toast msg={toastMsg} />
     </AdminShell>
