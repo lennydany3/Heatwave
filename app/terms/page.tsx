@@ -29,6 +29,15 @@ export default function TermsPage() {
           this agreement and to purchase tickets in your jurisdiction. You&apos;re responsible for
           keeping your account credentials secure.
         </p>
+        <p className="font-bold text-[#141414]">
+          I confirm that all details provided are accurate. Incorrect or incomplete credentials
+          may result in ticket rejection, with no refund.
+        </p>
+        <p>
+          You&apos;re asked to confirm this when you complete payment. If the details you submit —
+          including your name, contact details, UPI transaction ID, or payment screenshot — are
+          wrong or incomplete, we may reject the ticket, and no refund will be issued.
+        </p>
       </Section>
 
       <Section heading="3. Tickets and pricing">
