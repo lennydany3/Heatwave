@@ -53,7 +53,7 @@ const FALLBACK_TIERS: Tier[] = [
 
 const TIER_NOTE: Record<Tier["status"], string> = {
   open: "Limited early-bird price",
-  coming_soon: "Announced soon",
+  coming_soon: "Comeing Soon",
   closed: "Sold out",
 };
 
@@ -81,7 +81,7 @@ const FAQS = [
   },
   {
     q: "Why are prices different for male and female?",
-    a: "Pricing is set per gender for each ticket phase. The current prices are listed in the Tickets section above, and the next phase will be announced soon.",
+    a: "Pricing is set per gender for each ticket phase. The current prices are listed in the Tickets section above, and the next phase will be Comeing Soon.",
   },
 ];
 
@@ -176,7 +176,7 @@ export default function EventPage({
     { label: "DATE", value: EVENT.dateLabel },
     { label: "TIME", value: EVENT.timeLabel },
     { label: "VENUE", value: EVENT.venueShort },
-    { label: "PRICE", value: openPrices.length ? `From ${fromPrice}` : "Announced soon" },
+    { label: "PRICE", value: openPrices.length ? `From ${fromPrice}` : "Comeing Soon" },
   ];
 
   function handleRegisterClick(e?: MouseEvent) {
