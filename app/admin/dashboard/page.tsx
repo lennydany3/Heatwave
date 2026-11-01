@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import { BADGE, fmt } from "../_lib/data";
+import { Avatar, Chips, Empty, PageHeader, Panel, PanelHead, Pill, StatCard, StatGrid } from "../_components/ui";
 
 type BookingStatus = "Confirmed" | "Pending" | "Checked-in" | "Cancelled";
 type Range = "7D" | "30D" | "90D";
@@ -174,16 +175,9 @@ export default function AdminDashboardPage() {
 
   return (
     <AdminShell active="overview" search={q} onSearchChange={setQ}>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <div className="text-xs font-bold tracking-[0.14em] text-[#6B6B6B]">OVERVIEW</div>
-          <h1 className="m-0 mt-2 text-[30px] font-black leading-[1] tracking-[-0.04em] sm:text-[40px]">
-            Overview
-          </h1>
-        </div>
-      </div>
+      <PageHeader eyebrow="OVERVIEW" title="Overview" />
 
-      <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <StatGrid>
         {[
           { label: "TOTAL REVENUE", value: money(totalRevenue), note: `${paidCount} bookings` },
           { label: "TICKETS SOLD", value: String(paidCount), note: `${bookings.length} total registrations` },
@@ -193,135 +187,127 @@ export default function AdminDashboardPage() {
             value: String(checkedInToday),
             note: paidCount ? `${Math.round((checkedInToday / paidCount) * 100)}% of ${paidCount} sold` : "No tickets sold yet",
           },
-        ].map((k) => (
-          <div
-            key={k.label}
-            className="animate-[hwUp_0.5s_ease_both] rounded-xl border border-[#EDE6E3] bg-white p-5 transition-transform duration-250 hover:-translate-y-0.5"
-          >
-            <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">{k.label}</div>
-            {loading ? (
-              <div className="mt-3.5 h-[30px] w-3/5 animate-[hwPulse_1.4s_ease_infinite] rounded-lg bg-[#F3EEEB]" />
-            ) : (
-              <div className="mt-2.5 text-[32px] font-black tracking-[-0.035em] tabular-nums">{k.value}</div>
-            )}
-            <div className="mt-2 text-[13px] text-[#6B6B6B]">{k.note}</div>
-          </div>
+        ].map((k, i) => (
+          <StatCard key={k.label} index={i} dark={i === 0} loading={loading} {...k} />
         ))}
-      </div>
+      </StatGrid>
 
-      <div className="mt-5 flex flex-wrap items-stretch gap-5">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:mt-5 sm:gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
         {masks.includes("chart") ? (
-          <div className="flex min-w-0 flex-[2_1_520px] items-center justify-center rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6 text-sm font-bold text-[#6B6B6B]">
+          <div className="flex min-h-[160px] items-center justify-center rounded-2xl border border-dashed border-[#EDE6E3] bg-[#FAF7F5] p-6 text-sm font-bold text-[#6B6B6B]">
             Bookings chart hidden for your role
           </div>
         ) : (
-        <div className="min-w-0 flex-[2_1_520px] rounded-xl border border-[#EDE6E3] p-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <div className="text-[17px] font-bold">Bookings over time</div>
-              <div className="mt-0.5 text-[13px] text-[#6B6B6B]">
-                {chart.total} bookings in this period
+          <Panel className="p-4 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-[16px] font-bold sm:text-[17px]">Bookings over time</div>
+                <div className="mt-0.5 text-[13px] text-[#6B6B6B]">
+                  <span className="font-bold text-[#141414]">{chart.total}</span> bookings in this period
+                </div>
+              </div>
+              <div className="flex flex-none gap-0.5 rounded-full bg-[#F3EEEB] p-[3px]">
+                {(["7D", "30D", "90D"] as Range[]).map((r) => (
+                  <button
+                    key={r}
+                    onClick={() => setRange(r)}
+                    className={`rounded-full px-3 py-1.5 text-[12px] font-bold transition-all duration-200 sm:px-3.5 sm:text-[13px] ${
+                      range === r
+                        ? "bg-white text-[#141414] shadow-[0_1px_3px_rgba(20,20,20,.15)]"
+                        : "text-[#6B6B6B]"
+                    }`}
+                  >
+                    {r}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="flex gap-0.5 rounded-full border border-[#EDE6E3] p-[3px]">
-              {(["7D", "30D", "90D"] as Range[]).map((r) => (
-                <button
-                  key={r}
-                  onClick={() => setRange(r)}
-                  style={{
-                    background: range === r ? "#141414" : "transparent",
-                    color: range === r ? "#fff" : "#6B6B6B",
-                  }}
-                  className="rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors duration-200"
-                >
-                  {r}
-                </button>
-              ))}
+            <div className="relative mt-5 h-[170px] sm:h-[220px]">
+              <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
+                <span className="border-t border-dashed border-[#EDE6E3]" />
+                <span className="border-t border-dashed border-[#EDE6E3]" />
+                <span className="border-t border-dashed border-[#EDE6E3]" />
+                <span className="border-t border-[#EDE6E3]" />
+              </div>
+              <svg
+                viewBox="0 0 600 200"
+                preserveAspectRatio="none"
+                className="absolute inset-0 h-full w-full overflow-visible"
+              >
+                <defs>
+                  <linearGradient id="hw-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#E5251B" stopOpacity={0.3} />
+                    <stop offset="100%" stopColor="#E5251B" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <path d={chart.area} fill="url(#hw-area)" />
+                <path
+                  d={chart.line}
+                  fill="none"
+                  stroke="#E5251B"
+                  strokeWidth={2.5}
+                  vectorEffect="non-scaling-stroke"
+                  strokeLinejoin="round"
+                  style={{ filter: "drop-shadow(0 4px 6px rgba(229,37,27,.35))" }}
+                />
+              </svg>
             </div>
-          </div>
-          <div className="relative mt-5 h-[220px]">
-            <div className="pointer-events-none absolute inset-0 flex flex-col justify-between">
-              <span className="border-t border-[#EDE6E3]" />
-              <span className="border-t border-[#EDE6E3]" />
-              <span className="border-t border-[#EDE6E3]" />
-              <span className="border-t border-[#EDE6E3]" />
+            <div className="mt-2.5 flex justify-between text-xs text-[#6B6B6B]">
+              <span>{chart.x0}</span>
+              <span>{chart.x1}</span>
+              <span>Today</span>
             </div>
-            <svg
-              viewBox="0 0 600 200"
-              preserveAspectRatio="none"
-              className="absolute inset-0 h-full w-full overflow-visible"
-            >
-              <path d={chart.area} fill="#FDECEA" opacity={0.6} />
-              <path
-                d={chart.line}
-                fill="none"
-                stroke="#E5251B"
-                strokeWidth={2}
-                vectorEffect="non-scaling-stroke"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </div>
-          <div className="mt-2.5 flex justify-between text-xs text-[#6B6B6B]">
-            <span>{chart.x0}</span>
-            <span>{chart.x1}</span>
-            <span>Today</span>
-          </div>
-        </div>
+          </Panel>
         )}
-        <div className="min-w-0 flex-[1_1_300px] rounded-xl border border-[#EDE6E3] p-6">
-          <div className="text-[17px] font-bold">Top events by sales</div>
+        <Panel className="p-4 sm:p-6">
+          <div className="text-[16px] font-bold sm:text-[17px]">Top events by sales</div>
           {topEvents.length === 0 && (
-            <div className="mt-4 text-sm text-[#6B6B6B]">No paid bookings yet.</div>
+            <div className="mt-4 rounded-xl bg-[#FAF7F5] px-4 py-6 text-center text-sm text-[#6B6B6B]">
+              No paid bookings yet.
+            </div>
           )}
-          <div className="mt-4.5 flex flex-col gap-[18px]">
+          <div className="mt-4 flex flex-col gap-4">
             {topEvents.map(([name, rev], i) => (
-              <div key={name}>
-                <div className="flex justify-between gap-3 text-sm">
-                  <span className="font-bold">{name}</span>
-                  <span className="tabular-nums">{money(rev)}</span>
-                </div>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#F3EEEB]">
-                  <div
-                    className="h-full rounded-full transition-[width] duration-500 ease-out"
-                    style={{
-                      width: (topEvents[0][1] ? (rev / topEvents[0][1]) * 100 : 0) + "%",
-                      background: i === 0 ? "#E5251B" : "#141414",
-                    }}
-                  />
+              <div key={name} className="flex items-center gap-3">
+                <span
+                  className={`flex h-8 w-8 flex-none items-center justify-center rounded-xl text-[13px] font-black ${
+                    i === 0 ? "bg-[#E5251B] text-white" : "bg-[#F3EEEB] text-[#6B6B6B]"
+                  }`}
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex justify-between gap-3 text-sm">
+                    <span className="truncate font-bold">{name}</span>
+                    <span className="flex-none tabular-nums">{money(rev)}</span>
+                  </div>
+                  <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#F3EEEB]">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{
+                        width: (topEvents[0][1] ? (rev / topEvents[0][1]) * 100 : 0) + "%",
+                        background: i === 0 ? "linear-gradient(90deg,#B71C14,#E5251B)" : "#141414",
+                      }}
+                    />
+                  </div>
                 </div>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       </div>
 
-      <section className="mt-5 rounded-xl border border-[#EDE6E3]">
-        <div className="flex flex-wrap items-center justify-between gap-3.5 px-6 py-5">
-          <div className="text-[17px] font-bold">Recent bookings</div>
-          <div className="flex flex-wrap gap-1.5">
-            {FILTERS.map((l) => {
-              const on = filter === l;
-              return (
-                <button
-                  key={l}
-                  onClick={() => {
-                    setFilter(l);
-                    setPage(0);
-                  }}
-                  style={{
-                    background: on ? "#141414" : "#fff",
-                    color: on ? "#fff" : "#6B6B6B",
-                    borderColor: on ? "#141414" : "#EDE6E3",
-                  }}
-                  className="rounded-full border px-3.5 py-1.5 text-[13px] font-bold"
-                >
-                  {l}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+      <Panel className="mt-3 sm:mt-5">
+        <PanelHead title="Recent bookings">
+          <Chips
+            options={FILTERS.map((l) => ({ id: l, label: l }))}
+            value={filter}
+            onChange={(l) => {
+              setFilter(l);
+              setPage(0);
+            }}
+          />
+        </PanelHead>
 
         <div className="hidden lg:block">
           <div className="grid grid-cols-[1.6fr_1.6fr_.9fr_.8fr_.9fr_.6fr] gap-4 border-y border-[#EDE6E3] bg-[#FAF7F5] px-6 py-3 text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
@@ -333,115 +319,101 @@ export default function AdminDashboardPage() {
             <span>DATE</span>
           </div>
 
-          {loading &&
-            [1, 2, 3].map((k) => (
+          {!loading &&
+            pageRows.map((r) => (
               <div
-                key={k}
-                className="flex animate-[hwPulse_1.4s_ease_infinite] gap-4 border-b border-[#EDE6E3] px-6 py-[18px]"
+                key={r.id}
+                className="grid grid-cols-[1.6fr_1.6fr_.9fr_.8fr_.9fr_.6fr] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3 text-sm transition-colors last:border-b-0 hover:bg-[#FCFAF9]"
               >
-                <div className="h-3 w-[22%] rounded-full bg-[#F3EEEB]" />
-                <div className="h-3 w-[28%] rounded-full bg-[#F3EEEB]" />
-                <div className="h-3 w-[12%] rounded-full bg-[#F3EEEB]" />
+                <div className="flex min-w-0 items-center gap-3">
+                  <Avatar name={r.name} size={32} />
+                  <span className="truncate font-bold">{r.name}</span>
+                </div>
+                <div className="min-w-0 truncate">{r.event}</div>
+                <div className="text-[#6B6B6B]">{r.type}</div>
+                <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
+                <div>
+                  <Pill tone={BADGE[r.status]}>{r.status}</Pill>
+                </div>
+                <div className="text-[#6B6B6B]">{r.date}</div>
               </div>
             ))}
-
-          {!loading &&
-            pageRows.map((r) => {
-              const b = BADGE[r.status];
-              return (
-                <div
-                  key={r.id}
-                  className="grid grid-cols-[1.6fr_1.6fr_.9fr_.8fr_.9fr_.6fr] items-center gap-4 border-b border-[#EDE6E3] px-6 py-3.5 text-sm transition-colors hover:bg-[#FCFAF9]"
-                >
-                  <div className="min-w-0 truncate font-bold">{r.name}</div>
-                  <div className="min-w-0 truncate">{r.event}</div>
-                  <div className="text-[#6B6B6B]">{r.type}</div>
-                  <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
-                  <div>
-                    <span
-                      className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold"
-                      style={{ background: b[0], color: b[1] }}
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                      {r.status}
-                    </span>
-                  </div>
-                  <div className="text-[#6B6B6B]">{r.date}</div>
-                </div>
-              );
-            })}
         </div>
 
-        <div className="border-t border-[#EDE6E3] lg:hidden">
-          {pageRows.map((r) => {
-            const b = BADGE[r.status];
-            return (
-              <div key={r.id} className="flex flex-col gap-2 border-b border-[#EDE6E3] px-5 py-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-[15px] font-bold">{r.name}</span>
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
-                    style={{ background: b[0], color: b[1] }}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: b[2] }} />
-                    {r.status}
-                  </span>
+        <div className="lg:hidden">
+          {!loading &&
+            pageRows.map((r) => (
+              <div key={r.id} className="flex items-center gap-3 border-t border-[#EDE6E3] px-4 py-3.5">
+                <Avatar name={r.name} />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-[15px] font-bold">{r.name}</div>
+                  <div className="truncate text-[12.5px] text-[#6B6B6B]">
+                    {r.event} · {r.type} · {r.date}
+                  </div>
                 </div>
-                <div className="text-sm text-[#6B6B6B]">
-                  {r.event} · {r.type}
-                </div>
-                <div className="flex justify-between text-[13px] text-[#6B6B6B]">
-                  <span>{r.date}</span>
-                  <span className="text-sm font-bold text-[#141414]">{money(r.amount)}</span>
+                <div className="flex flex-none flex-col items-end gap-1.5">
+                  <span className="text-sm font-black tabular-nums">{money(r.amount)}</span>
+                  <Pill tone={BADGE[r.status]}>{r.status}</Pill>
                 </div>
               </div>
-            );
-          })}
+            ))}
         </div>
 
-        {total === 0 && !loading && (
-          <div className="border-t border-[#EDE6E3] px-6 py-14 text-center">
-            <div className="text-lg font-bold">No bookings match</div>
-            <div className="mt-1.5 text-sm text-[#6B6B6B]">
-              Try a different search or clear the status filter.
-            </div>
-            <button
-              onClick={() => {
-                setFilter("All");
-                setQ("");
-              }}
-              className="mt-4 text-sm font-bold text-[#E5251B]"
+        {loading &&
+          [1, 2, 3].map((k) => (
+            <div
+              key={k}
+              className="flex animate-[hwPulse_1.4s_ease_infinite] items-center gap-4 border-t border-[#EDE6E3] px-4 py-4 sm:px-6"
             >
-              Clear filters
-            </button>
-          </div>
+              <div className="h-8 w-8 flex-none rounded-full bg-[#F3EEEB]" />
+              <div className="h-3 w-[30%] rounded-full bg-[#F3EEEB]" />
+              <div className="h-3 w-[22%] rounded-full bg-[#F3EEEB]" />
+            </div>
+          ))}
+
+        {total === 0 && !loading && (
+          <Empty
+            title="No bookings match"
+            action={
+              <button
+                onClick={() => {
+                  setFilter("All");
+                  setQ("");
+                }}
+                className="mt-4 text-sm font-bold text-[#E5251B]"
+              >
+                Clear filters
+              </button>
+            }
+          >
+            Try a different search or clear the status filter.
+          </Empty>
         )}
 
         {total > 0 && (
-          <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3.5 text-[13px] text-[#6B6B6B]">
-            <span>
-              Showing {currentPage * PER_PAGE + 1}–
-              {Math.min(total, currentPage * PER_PAGE + PER_PAGE)} of {total}
+          <div className="flex items-center justify-between gap-3 border-t border-[#EDE6E3] px-4 py-3 text-[13px] text-[#6B6B6B] sm:px-6">
+            <span className="tabular-nums">
+              {currentPage * PER_PAGE + 1}–{Math.min(total, currentPage * PER_PAGE + PER_PAGE)} of {total}
             </span>
             <div className="flex gap-1.5">
               <button
                 onClick={() => currentPage > 0 && setPage(currentPage - 1)}
-                style={{ opacity: currentPage > 0 ? 1 : 0.4 }}
-                className="h-[34px] rounded-full border border-[#EDE6E3] px-3.5 font-bold"
+                disabled={currentPage === 0}
+                className="h-9 rounded-full border border-[#EDE6E3] bg-white px-3.5 font-bold text-[#141414] disabled:opacity-40"
               >
                 ← Prev
               </button>
               <button
                 onClick={() => currentPage < pages - 1 && setPage(currentPage + 1)}
-                style={{ opacity: currentPage < pages - 1 ? 1 : 0.4 }}
-                className="h-[34px] rounded-full border border-[#EDE6E3] px-3.5 font-bold"
+                disabled={currentPage >= pages - 1}
+                className="h-9 rounded-full border border-[#EDE6E3] bg-white px-3.5 font-bold text-[#141414] disabled:opacity-40"
               >
                 Next →
               </button>
             </div>
           </div>
         )}
-      </section>
+      </Panel>
     </AdminShell>
   );
 }
