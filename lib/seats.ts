@@ -88,3 +88,52 @@ export async function myInvite(
   const hit = data.find((w) => w.user_id === user.id || (email && w.email.toLowerCase() === email));
   return hit ? { id: hit.id, tierId: hit.ticket_tier_id } : null;
 }
+
+export type MyWaitlist = {
+  id: string;
+  status: "waiting" | "invited";
+  position: number | null; // place in the queue while waiting
+  eventName: string | null;
+  venue: string | null;
+  startsAt: string | null;
+  tierName: string | null;
+};
+
+// This customer's open waitlist entries (waiting or invited), matched by account
+// or by the email they joined with. Registered entries are done and not returned.
+export async function myWaitlist(
+  admin: SupabaseClient,
+  user: { id: string; email?: string | null },
+  eventId?: string
+): Promise<MyWaitlist[]> {
+  let query = admin
+    .from("waitlist")
+    .select(
+      "id, event_id, status, created_at, user_id, email, events(name, venue, starts_at), ticket_tiers(name)"
+    )
+    .in("status", ["waiting", "invited"])
+    .order("created_at");
+  if (eventId) query = query.eq("event_id", eventId);
+  const { data, error } = await query;
+  if (error || !data) return [];
+
+  const email = user.email?.toLowerCase();
+  const mine = data.filter((w) => w.user_id === user.id || (email && w.email.toLowerCase() === email));
+
+  return mine.map((w) => {
+    const ahead = data.filter(
+      (o) => o.event_id === w.event_id && o.status === "waiting" && o.created_at <= w.created_at
+    ).length;
+    const ev = w.events as unknown as { name: string; venue: string | null; starts_at: string | null } | null;
+    const tier = w.ticket_tiers as unknown as { name: string } | null;
+    return {
+      id: w.id,
+      status: w.status as "waiting" | "invited",
+      position: w.status === "waiting" ? ahead : null,
+      eventName: ev?.name ?? null,
+      venue: ev?.venue ?? null,
+      startsAt: ev?.starts_at ?? null,
+      tierName: tier?.name ?? null,
+    };
+  });
+}

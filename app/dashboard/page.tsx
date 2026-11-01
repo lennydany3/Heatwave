@@ -10,6 +10,16 @@ import { createClient } from "@/utils/supabase/client";
 type TicketStatus = "Confirmed" | "Cancelled" | "Checked-in" | "Verifying" | "Payment failed";
 type TabId = "upcoming" | "past" | "cancelled";
 
+type WaitlistEntry = {
+  id: string;
+  status: "waiting" | "invited";
+  position: number | null;
+  eventName: string | null;
+  venue: string | null;
+  startsAt: string | null;
+  tierName: string | null;
+};
+
 type Ticket = {
   id: string;
   title: string;
@@ -140,6 +150,7 @@ export default function DashboardPage() {
 
   const [tab, setTab] = useState<TabId>("upcoming");
   const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
@@ -211,6 +222,20 @@ export default function DashboardPage() {
     }
 
     load();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    fetch("/api/waitlist/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!cancelled && d?.entries) setWaitlist(d.entries);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -310,6 +335,61 @@ export default function DashboardPage() {
             Browse events
           </Link>
         </div>
+
+        {waitlist.map((w) => {
+          const invited = w.status === "invited";
+          return (
+            <div
+              key={w.id}
+              className="mt-10 flex animate-[hwUp_0.5s_0.05s_ease_both] flex-col overflow-hidden rounded-xl border border-[#EDE6E3] bg-white sm:flex-row"
+            >
+              <div className="w-full flex-none sm:w-1.5" style={{ background: invited ? "#3F8A5A" : "#D99A1E" }} />
+              <div className="min-w-0 flex-1 p-6 sm:p-8">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    background: invited ? "#EEF4EF" : "#FFF6E5",
+                    color: invited ? "#2F6B45" : "#8A5A00",
+                  }}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ background: invited ? "#3F8A5A" : "#D99A1E" }}
+                  />
+                  {invited ? "Seat held for you" : "On the waitlist"}
+                </span>
+                <div className="mt-3 text-[26px] font-black leading-[1.1] tracking-[-0.03em]">
+                  {w.eventName ?? "Event"}
+                </div>
+                <div className="mt-1 text-sm text-[#6B6B6B]">
+                  {w.tierName ?? "Ticket"}
+                  {w.venue ? ` · ${w.venue}` : ""}
+                </div>
+                <p className="mt-4 max-w-[60ch] text-[15px] leading-relaxed text-[#6B6B6B]">
+                  {invited
+                    ? "Good news — a seat opened up and it's being held for you. Complete your registration and payment to lock it in."
+                    : `You're in line${w.position ? ` at #${w.position}` : ""}. Hang tight — good things come to those who wait. When a seat frees up we'll invite you in order, and it'll show up right here.`}
+                </p>
+                {invited && (
+                  <Link
+                    href="/events/registations"
+                    className="mt-5 inline-flex h-[46px] items-center rounded-full bg-[#E5251B] px-6 text-[15px] font-bold text-white hover:bg-[#B71C14]"
+                  >
+                    Complete registration →
+                  </Link>
+                )}
+              </div>
+              {!invited && w.position && (
+                <div className="flex flex-none flex-col items-center justify-center border-t border-[#EDE6E3] bg-[#FAF7F5] px-9 py-6 sm:border-l sm:border-t-0">
+                  <div className="text-[11px] font-bold tracking-[0.14em] text-[#6B6B6B]">YOUR PLACE</div>
+                  <div className="mt-1 text-[48px] font-black leading-none tracking-[-0.04em] tabular-nums">
+                    #{w.position}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {loading && (
           <div className="mt-10 h-[280px] animate-[hwPulse_1.4s_ease_infinite] rounded-xl border border-[#EDE6E3] bg-[#FAF7F5]" />

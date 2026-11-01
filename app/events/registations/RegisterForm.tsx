@@ -50,6 +50,11 @@ type TicketResult = {
   amount?: number;
 };
 
+export type InitialWaitlist = {
+  status: "waiting" | "invited";
+  position: number | null;
+};
+
 export type ExistingRegistration = {
   status: "pending" | "paid" | "failed";
   ticketCode: string | null;
@@ -217,8 +222,10 @@ function Field({
 
 export default function RegisterForm({
   initialExisting,
+  initialWaitlist,
 }: {
   initialExisting: ExistingRegistration | null;
+  initialWaitlist: InitialWaitlist | null;
 }) {
   const { user } = useAuth();
 
@@ -236,7 +243,12 @@ export default function RegisterForm({
   const [availability, setAvailability] = useState<Record<string, TierAvailability>>({});
   const [joining, setJoining] = useState(false);
   const [waitlistError, setWaitlistError] = useState("");
-  const [waitlisted, setWaitlisted] = useState<{ position: number | null } | null>(null);
+  // Already queued (from the server) or just joined: show the waiting screen
+  // instead of the form. An invited customer sees the normal form instead.
+  const [waitlisted, setWaitlisted] = useState<{ position: number | null } | null>(
+    initialWaitlist?.status === "waiting" ? { position: initialWaitlist.position } : null
+  );
+  const invited = initialWaitlist?.status === "invited";
 
   const [upiTxnId, setUpiTxnId] = useState("");
   const [txnTouched, setTxnTouched] = useState(false);
@@ -491,6 +503,9 @@ export default function RegisterForm({
           <h1 className="m-0 mt-7 text-[40px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[60px]">
             You&apos;re on the waitlist
           </h1>
+          <p className="mt-3.5 text-[19px] font-bold tracking-[-0.01em]">
+            Hang tight — good things come to those who wait. 🌊
+          </p>
           {waitlisted.position && (
             <div className="mt-5 inline-flex rounded-full border border-[#EDE6E3] bg-[#FAF7F5] px-4 py-2 text-sm">
               Your place in the queue:{" "}
@@ -498,14 +513,28 @@ export default function RegisterForm({
             </div>
           )}
           <p className="mt-5 max-w-[46ch] text-[17px] leading-relaxed text-[#6B6B6B]">
-            Registration for {EVENT.name} is full right now. Some seats open up when payments
-            can&apos;t be verified — if one frees up for you, we&apos;ll contact you on{" "}
-            <span className="font-medium text-[#141414]">{values.email}</span> and your seat will be
-            held for you to register. No payment is needed until then.
+            Registration for {EVENT.name} is full right now, but you&apos;re in line. Seats open up
+            when a payment can&apos;t be verified, and we invite people in the order they joined.
+            When it&apos;s your turn, a seat is held for you and this page turns into your
+            registration form — no payment needed until then.
           </p>
-          <Link href="/" className={`mt-8 ${btn}`}>
-            Back to event page
-          </Link>
+          <div className="mt-6 w-full max-w-[460px] rounded-xl bg-[#FFF6E5] px-5 py-4 text-left text-sm leading-relaxed text-[#8A5A00]">
+            <span className="font-bold">What happens next:</span> keep an eye on{" "}
+            <span className="font-bold">My Tickets</span> and your email
+            {values.email ? ` (${values.email})` : ""}. You can leave this page — your place stays
+            saved.
+          </div>
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            <Link href="/dashboard" className={btn}>
+              Go to My Tickets
+            </Link>
+            <Link
+              href="/"
+              className="inline-flex h-[54px] items-center justify-center rounded-full border border-[#141414] px-7 text-[15px] font-bold transition-colors hover:bg-[#FAF7F5]"
+            >
+              Back to event page
+            </Link>
+          </div>
         </main>
       </Page>
     );
@@ -721,6 +750,16 @@ export default function RegisterForm({
 
             {step === 0 && (
               <section className="mt-10">
+                {invited && (
+                  <div className="mb-6 flex items-start gap-3 rounded-xl bg-[#EEF4EF] px-5 py-4 text-sm leading-relaxed text-[#2F6B45]">
+                    <span className="mt-[7px] h-1.5 w-1.5 flex-none rounded-full bg-[#3F8A5A]" />
+                    <span>
+                      <span className="font-bold">Good news — a seat opened up for you!</span> You
+                      came off the waitlist and your seat is held. Complete your registration and
+                      payment to lock it in.
+                    </span>
+                  </div>
+                )}
                 <div className="mb-10 rounded-xl border border-[#EDE6E3] bg-[#FAF7F5] p-6">
                   <div className="text-xs font-bold tracking-[0.14em] text-[#E5251B]">
                     {EVENT.tagline.toUpperCase()}

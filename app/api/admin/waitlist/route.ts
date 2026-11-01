@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { eventSeats } from "@/lib/seats";
 import { requireAdmin } from "../_lib/auth";
 
 export async function GET() {
@@ -9,7 +10,7 @@ export async function GET() {
   const { data, error } = await createAdminClient()
     .from("waitlist")
     .select(
-      "id, full_name, email, mobile, instagram, age, gender, status, created_at, ticket_tiers(name)"
+      "id, ticket_tier_id, full_name, email, mobile, instagram, age, gender, status, created_at, ticket_tiers(name)"
     )
     .order("created_at");
   if (error) {
@@ -21,6 +22,7 @@ export async function GET() {
   }
   const entries = (data ?? []).map((w) => ({
     id: w.id,
+    tierId: w.ticket_tier_id as string | null,
     fullName: w.full_name,
     email: w.email,
     mobile: w.mobile,
@@ -43,7 +45,36 @@ export async function PATCH(request: Request) {
   if (typeof body?.id !== "string" || (body.status !== "waiting" && body.status !== "invited")) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
-  const { error } = await createAdminClient()
+  const admin = createAdminClient();
+
+  // Inviting holds a seat, so there has to be one free: the admin must raise the
+  // seat limit (or free a seat) first.
+  if (body.status === "invited") {
+    const { data: entry } = await admin
+      .from("waitlist")
+      .select("event_id, ticket_tier_id, status")
+      .eq("id", body.id)
+      .single();
+    if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
+    if (entry.status === "waiting" && entry.ticket_tier_id) {
+      const seats = (await eventSeats(admin, entry.event_id)).find(
+        (s) => s.tierId === entry.ticket_tier_id
+      );
+      if (seats && seats.remaining !== null && seats.remaining < 1) {
+        return NextResponse.json(
+          {
+            error: "No seats are free. Increase the seat limit first.",
+            code: "no_seats",
+            tierId: seats.tierId,
+            limit: seats.limit,
+          },
+          { status: 409 }
+        );
+      }
+    }
+  }
+
+  const { error } = await admin
     .from("waitlist")
     .update({ status: body.status })
     .eq("id", body.id)

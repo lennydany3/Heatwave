@@ -1,7 +1,8 @@
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { EVENT } from "@/lib/event";
-import RegisterForm, { type ExistingRegistration } from "./RegisterForm";
+import { myWaitlist } from "@/lib/seats";
+import RegisterForm, { type ExistingRegistration, type InitialWaitlist } from "./RegisterForm";
 
 const EVENT_SLUG = EVENT.slug;
 
@@ -36,7 +37,23 @@ async function findExistingRegistration(): Promise<ExistingRegistration | null> 
   };
 }
 
+// Whether this account is already queued (or has been invited off the queue).
+async function findWaitlist(): Promise<InitialWaitlist | null> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const admin = createAdminClient();
+  const { data: event } = await admin.from("events").select("id").eq("slug", EVENT_SLUG).single();
+  if (!event) return null;
+
+  const entry = (await myWaitlist(admin, user, event.id))[0];
+  return entry ? { status: entry.status, position: entry.position } : null;
+}
+
 export default async function RegisterPage() {
-  const existing = await findExistingRegistration();
-  return <RegisterForm initialExisting={existing} />;
+  const [existing, waitlist] = await Promise.all([findExistingRegistration(), findWaitlist()]);
+  return <RegisterForm initialExisting={existing} initialWaitlist={existing ? null : waitlist} />;
 }
