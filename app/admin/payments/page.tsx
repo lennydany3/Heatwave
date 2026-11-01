@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import AdminShell from "../_components/AdminShell";
 import HeatwaveLoader from "@/components/HeatwaveLoader";
 import { fmt } from "../_lib/data";
-import { createClient } from "@/utils/supabase/client";
 
 type PayStatus = "Paid" | "Pending" | "Failed";
 type Txn = {
@@ -46,18 +45,19 @@ export default function AdminPaymentsPage() {
   const [filter, setFilter] = useState("All");
   const [loading, setLoading] = useState(true);
   const [txns, setTxns] = useState<Txn[]>([]);
+  const [masks, setMasks] = useState<string[]>([]);
+  const money = (n: number) => (masks.includes("amount") ? "₹ ••••" : fmt(n));
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      const supabase = createClient();
-      const { data } = await supabase
-        .from("registrations")
-        .select("id, full_name, amount, status, created_at, upi_txn_id, events(name)")
-        .order("created_at", { ascending: false })
-        .returns<RegistrationRow[]>();
+      // Read through the API so masked fields are blanked on the server.
+      const res = await fetch("/api/admin/payments", { cache: "no-store" });
+      const body = await res.json().catch(() => null);
+      const data: RegistrationRow[] = res.ok && body ? body.rows : [];
+      if (res.ok && body) setMasks(body.masks ?? []);
       if (cancelled) return;
-      const mapped: Txn[] = (data ?? [])
+      const mapped: Txn[] = data
         .filter((r) => r.status !== "cancelled")
         .map((r) => {
           const created = new Date(r.created_at);
@@ -105,8 +105,8 @@ export default function AdminPaymentsPage() {
 
       <div className="mt-7 grid grid-cols-1 gap-4 sm:grid-cols-3">
         {[
-          { l: "COLLECTED", v: fmt(collected), n: `${txns.filter((t) => t.st === "Paid").length} paid` },
-          { l: "PENDING", v: fmt(pending), n: `${txns.filter((t) => t.st === "Pending").length} awaiting verification` },
+          { l: "COLLECTED", v: money(collected), n: `${txns.filter((t) => t.st === "Paid").length} paid` },
+          { l: "PENDING", v: money(pending), n: `${txns.filter((t) => t.st === "Pending").length} awaiting verification` },
           { l: "FAILED", v: String(failedCount), n: "attempts" },
         ].map((k) => (
           <div key={k.l} className="rounded-xl border border-[#EDE6E3] p-5">
@@ -173,7 +173,7 @@ export default function AdminPaymentsPage() {
                       <div className="truncate font-bold">{r.name}</div>
                       <div className="truncate text-xs text-[#6B6B6B]">{r.event}</div>
                     </div>
-                    <div className="text-right font-bold tabular-nums">{fmt(r.amount)}</div>
+                    <div className="text-right font-bold tabular-nums">{money(r.amount)}</div>
                     <div>
                       <span
                         className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold"
@@ -195,7 +195,7 @@ export default function AdminPaymentsPage() {
                   <div key={r.id} className="flex flex-col gap-1.5 border-b border-[#EDE6E3] px-5 py-4">
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-bold">{r.name}</span>
-                      <span className="font-black">{fmt(r.amount)}</span>
+                      <span className="font-black">{money(r.amount)}</span>
                     </div>
                     <div className="text-[13px] text-[#6B6B6B]">
                       {r.tx} · {r.event}

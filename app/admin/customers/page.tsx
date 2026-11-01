@@ -13,7 +13,7 @@ type Customer = {
   email: string;
   mobile: string;
   instagram: string | null;
-  age: number;
+  age: number | null;
   gender: string;
   amount: number;
   decision: VerifyState;
@@ -96,6 +96,9 @@ export default function AdminCustomersPage() {
   const [rows, setRows] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [masks, setMasks] = useState<string[]>([]);
+  const has = (item: string) => masks.includes(item);
+  const money = (n: number) => (masks.includes("payment") ? "₹ ••••" : fmt(n));
   const [openId, setOpenId] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Customer | null>(null);
   const [confirmText, setConfirmText] = useState("");
@@ -119,6 +122,7 @@ export default function AdminCustomersPage() {
     } else {
       setLoadError("");
       setRows(data.customers);
+      setMasks(data.masks ?? []);
     }
     setLoading(false);
   }, []);
@@ -279,11 +283,11 @@ export default function AdminCustomersPage() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[16px] font-bold">{c.fullName}</span>
                     <span className="block truncate text-[13px] text-[#6B6B6B]">
-                      {c.email} · {c.mobile}
+                      {has("contact") ? "Contact details hidden" : `${c.email} · ${c.mobile}`}
                     </span>
                   </span>
                   <span className="hidden flex-none text-right sm:block">
-                    <span className="block text-[15px] font-bold tabular-nums">{fmt(c.amount)}</span>
+                    <span className="block text-[15px] font-bold tabular-nums">{money(c.amount)}</span>
                     <span className="block text-xs text-[#6B6B6B]">{c.tierName ?? "Ticket"}</span>
                   </span>
                   <Badge state={c.decision} />
@@ -307,7 +311,7 @@ export default function AdminCustomersPage() {
                           <Detail label="EMAIL" value={c.email} />
                           <Detail label="MOBILE" value={c.mobile} />
                           <Detail label="INSTAGRAM" value={c.instagram ? `@${c.instagram.replace(/^@/, "")}` : null} />
-                          <Detail label="AGE" value={String(c.age)} />
+                          <Detail label="AGE" value={c.age === null ? null : String(c.age)} />
                           <Detail label="GENDER" value={c.gender ? c.gender[0].toUpperCase() + c.gender.slice(1) : null} />
                         </div>
 
@@ -317,7 +321,7 @@ export default function AdminCustomersPage() {
                         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
                           <Detail label="EVENT" value={c.eventName} />
                           <Detail label="TICKET TYPE" value={c.tierName} />
-                          <Detail label="AMOUNT" value={fmt(c.amount)} />
+                          <Detail label="AMOUNT" value={money(c.amount)} />
                           <Detail label="UPI TXN ID" value={c.upiTxnId} />
                           <Detail label="BOOKING ID" value={c.ticketCode} />
                           <Detail label="REGISTERED" value={when(c.createdAt)} />
@@ -357,15 +361,17 @@ export default function AdminCustomersPage() {
                               className="object-cover"
                             />
                           ) : (
-                            "No screenshot"
+                            has("proof") ? "Hidden" : "No screenshot"
                           )}
                         </button>
-                        <button
-                          onClick={() => askDelete(c)}
-                          className="h-10 rounded-full border border-[#F3C9C5] bg-white px-5 text-[13px] font-bold text-[#B71C14] transition-colors hover:bg-[#B71C14] hover:text-white"
-                        >
-                          Delete customer
-                        </button>
+                        {!has("delete") && (
+                          <button
+                            onClick={() => askDelete(c)}
+                            className="h-10 rounded-full border border-[#F3C9C5] bg-white px-5 text-[13px] font-bold text-[#B71C14] transition-colors hover:bg-[#B71C14] hover:text-white"
+                          >
+                            Delete customer
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

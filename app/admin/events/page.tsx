@@ -38,7 +38,7 @@ type EventRow = {
 
 const QUICK_LIMITS = [5, 10, 20, 30, 35, 50];
 
-const price = (n: number | null) => (n ? fmt(n) : "× × ×");
+const price = (n: number | null, hidden = false) => (hidden ? "••••" : n ? fmt(n) : "× × ×");
 
 function tierBadge(t: Tier): { label: string; c: [string, string, string] } {
   if (t.status === "coming_soon") return { label: "Coming soon", c: ["#FFF6E5", "#8A5A00", "#D99A1E"] };
@@ -50,10 +50,12 @@ function tierBadge(t: Tier): { label: string; c: [string, string, string] } {
 function TierCard({
   tier,
   busy,
+  masks,
   onSave,
 }: {
   tier: Tier;
   busy: boolean;
+  masks: string[];
   onSave: (body: { seatLimit?: number | null; status?: TierStatus }) => void;
 }) {
   const [draft, setDraft] = useState(tier.limit === null ? "" : String(tier.limit));
@@ -62,6 +64,9 @@ function TierCard({
   const pct = tier.limit ? Math.min(100, Math.round((used / tier.limit) * 100)) : 0;
   const parsed = draft === "" ? null : Number(draft);
   const dirty = parsed !== tier.limit;
+
+  const canToggle = !masks.includes("registration_toggle");
+  const canEditSeats = !masks.includes("seat_edit");
 
   if (tier.status === "coming_soon") {
     return (
@@ -80,13 +85,15 @@ function TierCard({
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: badge.c[2] }} />
             {badge.label}
           </span>
-          <button
-            onClick={() => onSave({ status: "open" })}
-            disabled={busy}
-            className="h-9 rounded-full border border-[#EDE6E3] bg-white px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
-          >
-            Start sales
-          </button>
+          {canToggle && (
+            <button
+              onClick={() => onSave({ status: "open" })}
+              disabled={busy}
+              className="h-9 rounded-full border border-[#EDE6E3] bg-white px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
+            >
+              Start sales
+            </button>
+          )}
         </div>
       </div>
     );
@@ -98,7 +105,7 @@ function TierCard({
         <div>
           <div className="text-[15px] font-bold">{tier.name}</div>
           <div className="text-[13px] text-[#6B6B6B]">
-            Female {price(tier.priceFemale)} · Male {price(tier.priceMale)}
+            Female {price(tier.priceFemale, masks.includes("prices"))} · Male {price(tier.priceMale, masks.includes("prices"))}
           </div>
         </div>
         <span
@@ -139,10 +146,12 @@ function TierCard({
       </div>
 
       <div className="mt-4 border-t border-[#EDE6E3] pt-4">
-        <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
-          REGISTRATION SEATS
-        </div>
-        <div className="mt-2 flex flex-wrap gap-1.5">
+        {canEditSeats && (
+          <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
+            REGISTRATION SEATS
+          </div>
+        )}
+        <div className={canEditSeats ? "mt-2 flex flex-wrap gap-1.5" : "hidden"}>
           {QUICK_LIMITS.map((n) => (
             <button
               key={n}
@@ -170,6 +179,7 @@ function TierCard({
           </button>
         </div>
         <div className="mt-2.5 flex flex-wrap items-center gap-2.5">
+          {canEditSeats && (
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value.replace(/\D/g, "").slice(0, 5))}
@@ -177,6 +187,8 @@ function TierCard({
             placeholder="Custom, e.g. 40"
             className="h-10 w-[150px] rounded-xl border border-[#EDE6E3] bg-white px-3.5 text-[15px] outline-none focus:border-[#E5251B] focus:shadow-[0_0_0_3px_rgba(229,37,27,.12)]"
           />
+          )}
+          {canEditSeats && (
           <button
             onClick={() => onSave({ seatLimit: parsed })}
             disabled={busy || !dirty}
@@ -184,8 +196,9 @@ function TierCard({
           >
             Save limit
           </button>
+          )}
           <span className="flex-1" />
-          {tier.status === "open" && (
+          {canToggle && tier.status === "open" && (
             <button
               onClick={() => onSave({ status: "closed" })}
               disabled={busy}
@@ -194,7 +207,7 @@ function TierCard({
               Close registration
             </button>
           )}
-          {tier.status === "closed" && (
+          {canToggle && tier.status === "closed" && (
             <button
               onClick={() => onSave({ status: "open" })}
               disabled={busy}
@@ -204,13 +217,15 @@ function TierCard({
             </button>
           )}
         </div>
-        <button
-          onClick={() => onSave({ status: "coming_soon" })}
-          disabled={busy}
-          className="mt-3 block text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414] disabled:opacity-35"
-        >
-          Set back to &ldquo;Coming soon&rdquo;
-        </button>
+        {canToggle && (
+          <button
+            onClick={() => onSave({ status: "coming_soon" })}
+            disabled={busy}
+            className="mt-3 block text-[13px] font-bold text-[#6B6B6B] hover:text-[#141414] disabled:opacity-35"
+          >
+            Set back to &ldquo;Coming soon&rdquo;
+          </button>
+        )}
         {tier.waiting > 0 && (
           <Link href="/admin/waitlist" className="mt-3 inline-block text-[13px] font-bold text-[#E5251B]">
             {tier.waiting} on the waitlist →
@@ -227,6 +242,7 @@ export default function AdminEventsPage() {
   const [loadError, setLoadError] = useState("");
   const [events, setEvents] = useState<EventRow[]>([]);
   const [migrated, setMigrated] = useState(true);
+  const [masks, setMasks] = useState<string[]>([]);
   const [busyTier, setBusyTier] = useState<string | null>(null);
   const [toastMsg, setToastMsg] = useState("");
   const [now, setNow] = useState(0);
@@ -247,6 +263,7 @@ export default function AdminEventsPage() {
       setLoadError("");
       setEvents(data.events);
       setMigrated(data.migrated);
+      setMasks(data.masks ?? []);
     }
     setNow(Date.now());
     setLoading(false);
@@ -372,7 +389,7 @@ export default function AdminEventsPage() {
                     { l: "PENDING", v: String(e.pending) },
                     { l: "DECLINED / FAILED", v: String(e.declined) },
                     { l: "WAITLIST", v: String(e.waiting) },
-                    { l: "REVENUE", v: fmt(e.revenue) },
+                    { l: "REVENUE", v: masks.includes("revenue") ? "₹ ••••" : fmt(e.revenue) },
                   ].map((k) => (
                     <div key={k.l}>
                       <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
@@ -391,6 +408,7 @@ export default function AdminEventsPage() {
                       key={`${t.id}-${t.limit}`}
                       tier={t}
                       busy={busyTier === t.id}
+                      masks={masks}
                       onSave={(body) =>
                         saveTier(
                           t,

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { eventSeats } from "@/lib/seats";
-import { isMissingColumn, requireAdmin } from "../_lib/auth";
+import { getAccess, isMissingColumn } from "../_lib/auth";
 
 type TierRow = {
   id: string;
@@ -14,9 +14,12 @@ type TierRow = {
 };
 
 export async function GET() {
-  if (!(await requireAdmin())) {
+  // The waitlist page also reads seat counts from here, so either page may call it.
+  const access = await getAccess();
+  if (!access || !(access.can("events") || access.can("waitlist"))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const m = (item: string) => access.masked("events", item);
   const admin = createAdminClient();
 
   const { data: events, error } = await admin
@@ -54,7 +57,7 @@ export async function GET() {
         accepted: accepted.length,
         pending: mine.filter((r) => r.status === "pending").length,
         declined: mine.filter((r) => r.status === "failed").length,
-        revenue: accepted.reduce((a, r) => a + r.amount, 0),
+        revenue: m("revenue") ? 0 : accepted.reduce((a, r) => a + r.amount, 0),
         waiting: seats.reduce((a, s) => a + s.waiting, 0),
         tiers: tiers
           .filter((t) => t.event_id === e.id)
@@ -63,8 +66,8 @@ export async function GET() {
             return {
               id: t.id,
               name: t.name,
-              priceMale: t.price_male,
-              priceFemale: t.price_female,
+              priceMale: m("prices") ? null : t.price_male,
+              priceFemale: m("prices") ? null : t.price_female,
               status: t.status,
               limit: s?.limit ?? null,
               accepted: s?.accepted ?? 0,
@@ -79,5 +82,6 @@ export async function GET() {
     })
   );
 
-  return NextResponse.json({ events: result, migrated });
+  const masks = ["revenue", "prices", "seat_edit", "registration_toggle"].filter(m);
+  return NextResponse.json({ events: result, migrated, masks });
 }

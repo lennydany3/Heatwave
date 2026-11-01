@@ -44,6 +44,8 @@ export default function AdminWaitlistPage() {
   const [migrated, setMigrated] = useState(true);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [masks, setMasks] = useState<string[]>([]);
+  const has = (item: string) => masks.includes(item);
   const [busy, setBusy] = useState<string | null>(null);
   // Invite blocked because the ticket is full: ask the admin to raise the limit first.
   const [noSeats, setNoSeats] = useState<{ entry: Entry; tier: TierSeats } | null>(null);
@@ -76,6 +78,7 @@ export default function AdminWaitlistPage() {
       setLoadError("");
       setEntries(wd.entries);
       setMigrated(wd.migrated);
+      setMasks(wd.masks ?? []);
     }
     if (e.ok && ed) {
       setTiers(
@@ -269,8 +272,8 @@ export default function AdminWaitlistPage() {
                     </span>
                   </div>
                   <div className="mt-1 text-[13px] text-[#6B6B6B]">
-                    {e.email} · {e.mobile}
-                    {e.instagram ? ` · @${e.instagram.replace(/^@/, "")}` : ""}
+                    {has("contact") ? "Contact details hidden" : `${e.email} · ${e.mobile}`}
+                    {!has("contact") && e.instagram ? ` · @${e.instagram.replace(/^@/, "")}` : ""}
                     {e.age ? ` · ${e.age}` : ""}
                     {e.gender ? ` · ${e.gender}` : ""}
                   </div>
@@ -279,7 +282,7 @@ export default function AdminWaitlistPage() {
                   </div>
                 </div>
                 <div className="flex flex-none flex-wrap gap-2">
-                  {e.status === "waiting" && (
+                  {e.status === "waiting" && !has("invite") && (
                     <button
                       onClick={() => invite(e)}
                       disabled={disabled}
@@ -288,7 +291,7 @@ export default function AdminWaitlistPage() {
                       Invite
                     </button>
                   )}
-                  {e.status === "invited" && (
+                  {e.status === "invited" && !has("invite") && (
                     <button
                       onClick={() => act(e, "PATCH", "waiting", "Moved back to waiting")}
                       disabled={disabled}
@@ -297,13 +300,15 @@ export default function AdminWaitlistPage() {
                       Undo invite
                     </button>
                   )}
-                  <button
-                    onClick={() => askDelete(e)}
-                    disabled={disabled}
-                    className="h-9 rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#B71C14] hover:text-white disabled:opacity-35"
-                  >
-                    Delete
-                  </button>
+                  {!has("delete") && (
+                    <button
+                      onClick={() => askDelete(e)}
+                      disabled={disabled}
+                      className="h-9 rounded-full border border-[#F3C9C5] px-5 text-[13px] font-bold text-[#B71C14] hover:bg-[#B71C14] hover:text-white disabled:opacity-35"
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             );

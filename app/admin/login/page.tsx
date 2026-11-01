@@ -18,9 +18,12 @@ export default function AdminLoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error") === "not-admin") {
+    const reason = params.get("error");
+    if (reason === "not-admin") {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setErr("That account doesn't have admin access.");
+    } else if (reason === "no-access") {
+      setErr("This account has no pages assigned yet. Ask an admin to set up your access.");
     }
   }, []);
 
@@ -46,7 +49,7 @@ export default function AdminLoginPage() {
         return;
       }
       // Full navigation so the app picks up the fresh session cookie.
-      window.location.href = "/admin/dashboard";
+      window.location.href = data?.redirect ?? "/admin/dashboard";
     } catch {
       setLoading(false);
       setErr("Network error — check your connection and try again");

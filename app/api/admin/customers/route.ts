@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { verifyState, type Decision, type PaymentStatus } from "@/lib/verification";
-import { isMissingColumn, requireAdmin } from "../_lib/auth";
+import { isMissingColumn, requireAccess } from "../_lib/auth";
 
 const PROOF_BUCKET = "payment-proofs";
 const SIGNED_URL_TTL = 60 * 60;
@@ -12,9 +12,11 @@ const COLUMNS =
 type Row = Record<string, unknown>;
 
 export async function GET() {
-  if (!(await requireAdmin())) {
+  const access = await requireAccess("customers");
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const m = (item: string) => access.masked("customers", item);
 
   const admin = createAdminClient();
   const list = (columns: string) =>
@@ -51,35 +53,37 @@ export async function GET() {
     return {
       id: r.id as string,
       fullName: r.full_name as string,
-      email: r.email as string,
-      mobile: r.mobile as string,
-      instagram: (r.instagram as string | null) ?? null,
-      age: r.age as number,
-      gender: r.gender as string,
-      amount: r.amount as number,
+      email: m("contact") ? "Hidden" : (r.email as string),
+      mobile: m("contact") ? "Hidden" : (r.mobile as string),
+      instagram: m("instagram") ? null : (r.instagram as string | null) ?? null,
+      age: m("personal") ? null : (r.age as number),
+      gender: m("personal") ? "" : (r.gender as string),
+      amount: m("payment") ? 0 : (r.amount as number),
       decision: verifyState(
         r.status as PaymentStatus,
         (r.verification_decision as Decision | null | undefined) ?? null
       ),
-      upiTxnId: (r.upi_txn_id as string | null) ?? null,
+      upiTxnId: m("payment") ? null : (r.upi_txn_id as string | null) ?? null,
       note: (r.verification_note as string | null) ?? null,
       createdAt: r.created_at as string,
       eventName: event?.name ?? null,
       tierName: tier?.name ?? null,
       ticketCode: ticket?.ticket_code ?? null,
       checkedInAt: ticket?.checked_in_at ?? null,
-      proofUrl: proofPath ? signed.get(proofPath) ?? null : null,
+      proofUrl: !m("proof") && proofPath ? signed.get(proofPath) ?? null : null,
     };
   });
 
-  return NextResponse.json({ customers });
+  const masks = ["contact", "instagram", "personal", "payment", "proof", "delete"].filter(m);
+  return NextResponse.json({ customers, masks });
 }
 
 // Permanently removes a customer: their ticket(s), payment proof and the
 // registration itself. Payments, verification, check-in and the dashboards all
 // read from these rows, so they disappear everywhere at once.
 export async function DELETE(request: Request) {
-  if (!(await requireAdmin())) {
+  const access = await requireAccess("customers");
+  if (!access || access.masked("customers", "delete")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

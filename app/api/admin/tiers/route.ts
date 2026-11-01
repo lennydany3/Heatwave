@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { isMissingColumn, requireAdmin } from "../_lib/auth";
+import { getAccess, isMissingColumn } from "../_lib/auth";
 
 // Admin controls for a ticket tier: the seat limit (null = unlimited) and a
 // manual open / close switch. Auto-close when full is derived from the limit and
 // live registration counts (see lib/seats.ts), so it needs no status change.
 export async function PATCH(request: Request) {
-  if (!(await requireAdmin())) {
+  // The waitlist page can raise a seat limit to make room for an invite.
+  const access = await getAccess();
+  if (!access || !(access.can("events") || access.can("waitlist"))) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -30,6 +32,13 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
     update.status = body!.status;
+  }
+  const seatEditOk =
+    (access.can("events") && !access.masked("events", "seat_edit")) ||
+    (access.can("waitlist") && !access.masked("waitlist", "invite"));
+  const toggleOk = access.can("events") && !access.masked("events", "registration_toggle");
+  if (("seat_limit" in update && !seatEditOk) || ("status" in update && !toggleOk)) {
+    return NextResponse.json({ error: "You don't have permission to do that" }, { status: 403 });
   }
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });

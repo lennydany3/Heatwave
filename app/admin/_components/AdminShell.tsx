@@ -4,20 +4,34 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type ChangeEvent, type ReactNode } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { canView, ROLE_LABEL } from "@/lib/permissions";
+import { clearMe, useMe, type Me } from "../_lib/access";
 import { ADMIN_NAV, type AdminPageKey } from "../_lib/data";
 
 function NavLinks({
   active,
   itemClassName,
   onNavigate,
+  me,
 }: {
   active: AdminPageKey;
   itemClassName: string;
   onNavigate?: () => void;
+  me: Me | null;
 }) {
+  // Only the pages this person may open; a placeholder row until we know who they are.
+  const items = me ? ADMIN_NAV.filter((n) => canView(me.role, me.permissions, n.key)) : [];
   return (
     <>
-      {ADMIN_NAV.map((n) => {
+      {!me &&
+        [1, 2, 3, 4, 5].map((k) => (
+          <span
+            key={k}
+            className="mx-3 my-2.5 block h-4 animate-[hwPulse_1.4s_ease_infinite] rounded bg-[#EDE6E3]"
+            style={{ width: 60 + ((k * 23) % 50) }}
+          />
+        ))}
+      {items.map((n) => {
         const on = n.key === active;
         return (
           <Link
@@ -55,6 +69,7 @@ export default function AdminShell({
 }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const { user, signOut } = useAuth();
+  const me = useMe();
   const router = useRouter();
   const email = user?.email ?? "";
   const initials = email ? email.slice(0, 2).toUpperCase() : "AD";
@@ -64,6 +79,7 @@ export default function AdminShell({
   }
 
   async function handleLogout() {
+    clearMe();
     await signOut();
     router.push("/admin/login");
   }
@@ -86,6 +102,7 @@ export default function AdminShell({
         <nav className="flex flex-col gap-0.5">
           <NavLinks
             active={active}
+            me={me}
             itemClassName="flex items-center gap-3 rounded-[10px] px-3 py-2.5 text-sm font-bold transition-colors hover:bg-white hover:text-[#141414]"
           />
         </nav>
@@ -93,6 +110,11 @@ export default function AdminShell({
           Signed in as
           <br />
           <span className="font-bold text-[#141414]">{email}</span>
+          {me && (
+            <span className="ml-2 rounded-full border border-[#EDE6E3] bg-white px-2 py-0.5 text-[10px] font-bold tracking-[0.1em] text-[#6B6B6B]">
+              {ROLE_LABEL[me.role].toUpperCase()}
+            </span>
+          )}
           <button
             onClick={handleLogout}
             className="mt-2 block text-sm font-bold text-[#E5251B]"
@@ -119,6 +141,7 @@ export default function AdminShell({
             </div>
             <NavLinks
               active={active}
+              me={me}
               onNavigate={() => setDrawerOpen(false)}
               itemClassName="flex items-center gap-3 rounded-[10px] px-3 py-3 text-[15px] font-bold"
             />

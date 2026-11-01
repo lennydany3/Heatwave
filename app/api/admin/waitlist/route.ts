@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { eventSeats } from "@/lib/seats";
-import { requireAdmin } from "../_lib/auth";
+import { requireAccess } from "../_lib/auth";
 
 export async function GET() {
-  if (!(await requireAdmin())) {
+  const access = await requireAccess("waitlist");
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const m = (item: string) => access.masked("waitlist", item);
   const { data, error } = await createAdminClient()
     .from("waitlist")
     .select(
@@ -24,21 +26,23 @@ export async function GET() {
     id: w.id,
     tierId: w.ticket_tier_id as string | null,
     fullName: w.full_name,
-    email: w.email,
-    mobile: w.mobile,
-    instagram: w.instagram,
+    email: m("contact") ? "Hidden" : w.email,
+    mobile: m("contact") ? "Hidden" : w.mobile,
+    instagram: m("contact") ? null : w.instagram,
     age: w.age,
     gender: w.gender,
     status: w.status as "waiting" | "invited" | "registered",
     createdAt: w.created_at,
     tierName: (w.ticket_tiers as unknown as { name: string } | null)?.name ?? null,
   }));
-  return NextResponse.json({ entries, migrated: true });
+  const masks = ["contact", "invite", "delete"].filter(m);
+  return NextResponse.json({ entries, migrated: true, masks });
 }
 
 // Invite (release a seat for them) or move back to waiting.
 export async function PATCH(request: Request) {
-  if (!(await requireAdmin())) {
+  const access = await requireAccess("waitlist");
+  if (!access || access.masked("waitlist", "invite")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as Record<string, unknown> | null;
@@ -84,7 +88,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  if (!(await requireAdmin())) {
+  const access = await requireAccess("waitlist");
+  if (!access || access.masked("waitlist", "delete")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
   const body = (await request.json().catch(() => null)) as { id?: unknown } | null;

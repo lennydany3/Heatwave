@@ -3,8 +3,6 @@
 import jsQR from "jsqr";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AdminShell from "../_components/AdminShell";
-import { EVENT } from "@/lib/event";
-import { createClient } from "@/utils/supabase/client";
 
 type EventInfo = { id: string; name: string; venue: string | null; starts_at: string | null };
 
@@ -33,9 +31,6 @@ type LookupResult =
   | { kind: "payment-failed"; ticket: TicketRow }
   | { kind: "ready"; ticket: TicketRow };
 
-const TICKET_SELECT =
-  "id, ticket_code, status, checked_in_at, registrations(full_name, email, status, verification_note, upi_txn_id, ticket_tiers(name))";
-
 const isVerified = (t: TicketRow) => t.registrations?.status === "paid";
 
 function classify(ticket: TicketRow): LookupResult {
@@ -55,6 +50,8 @@ export default function AdminCheckInPage() {
   const [q, setQ] = useState("");
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [tickets, setTickets] = useState<TicketRow[]>([]);
+  const [masks, setMasks] = useState<string[]>([]);
+  const has = (item: string) => masks.includes(item);
   const [loading, setLoading] = useState(true);
   const [toastMsg, setToastMsg] = useState("");
   const toastTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -77,36 +74,23 @@ export default function AdminCheckInPage() {
     toastTimer.current = setTimeout(() => setToastMsg(""), 2400);
   }
 
-  const loadTickets = useCallback(async (eventId: string) => {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("tickets")
-      .select(TICKET_SELECT)
-      .eq("event_id", eventId)
-      .order("created_at", { ascending: false })
-      .returns<TicketRow[]>();
-    setTickets(data ?? []);
+  // All data goes through the API so masked fields are blanked on the server.
+  const load = useCallback(async () => {
+    const res = await fetch("/api/admin/checkin", { cache: "no-store" });
+    const data = await res.json().catch(() => null);
+    if (res.ok && data) {
+      setEvent(data.event);
+      setTickets(data.tickets);
+      setMasks(data.masks ?? []);
+    }
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      const supabase = createClient();
-      const { data: eventRow } = await supabase
-        .from("events")
-        .select("id, name, venue, starts_at")
-        .eq("slug", EVENT.slug)
-        .single();
-      if (cancelled || !eventRow) return;
-      setEvent(eventRow);
-      await loadTickets(eventRow.id);
-    }
+    // Data fetch on mount; state is set after the request resolves.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
-    return () => {
-      cancelled = true;
-    };
-  }, [loadTickets]);
+  }, [load]);
 
   const inCount = tickets.filter((t) => t.status === "checked_in").length;
   const soldCount = tickets.filter((t) => t.status !== "cancelled").length;
@@ -134,13 +118,11 @@ export default function AdminCheckInPage() {
   const doLookup = useCallback(async (rawCode: string) => {
     const code = rawCode.trim().toUpperCase();
     if (!code) return;
-    const supabase = createClient();
-    const { data: ticket } = await supabase
-      .from("tickets")
-      .select(TICKET_SELECT)
-      .eq("ticket_code", code)
-      .returns<TicketRow[]>()
-      .maybeSingle();
+    const res = await fetch(`/api/admin/checkin?code=${encodeURIComponent(code)}`, {
+      cache: "no-store",
+    });
+    const data = await res.json().catch(() => null);
+    const ticket = res.ok ? (data?.ticket as TicketRow | null) : null;
     setLookup(ticket ? classify(ticket) : { kind: "not-found", code });
   }, []);
 
@@ -202,35 +184,35 @@ export default function AdminCheckInPage() {
   async function approve() {
     if (!lookup || lookup.kind !== "ready" || approving || !event) return;
     setApproving(true);
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("tickets")
-      .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
-      .eq("id", lookup.ticket.id);
+    const res = await fetch("/api/admin/checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticketId: lookup.ticket.id }),
+    });
     setApproving(false);
-    if (error) {
+    if (!res.ok) {
       showToast("Couldn't check in — try again");
       return;
     }
     showToast((lookup.ticket.registrations?.full_name ?? "Attendee") + " checked in");
     setLookup(null);
     setManualCode("");
-    loadTickets(event.id);
+    load();
   }
 
   async function handleCheckIn(t: TicketRow) {
     if (t.status !== "valid" || !isVerified(t)) return;
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("tickets")
-      .update({ status: "checked_in", checked_in_at: new Date().toISOString() })
-      .eq("id", t.id);
-    if (error) {
+    const res = await fetch("/api/admin/checkin", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ticketId: t.id }),
+    });
+    if (!res.ok) {
       showToast("Couldn't check in — try again");
       return;
     }
     showToast((t.registrations?.full_name ?? "Attendee") + " checked in");
-    if (event) loadTickets(event.id);
+    load();
   }
 
   function exportCsv() {
@@ -282,13 +264,15 @@ export default function AdminCheckInPage() {
             </div>
           )}
         </div>
-        <button
-          onClick={exportCsv}
-          disabled={tickets.length === 0}
-          className="inline-flex h-11 items-center rounded-full border border-[#141414] px-5 text-sm font-bold hover:bg-[#FAF7F5] disabled:opacity-40"
-        >
-          Export CSV
-        </button>
+        {!has("export") && (
+          <button
+            onClick={exportCsv}
+            disabled={tickets.length === 0}
+            className="inline-flex h-11 items-center rounded-full border border-[#141414] px-5 text-sm font-bold hover:bg-[#FAF7F5] disabled:opacity-40"
+          >
+            Export CSV
+          </button>
+        )}
       </div>
 
       <div className="mt-7 flex flex-wrap items-start gap-5">
@@ -469,6 +453,11 @@ export default function AdminCheckInPage() {
                     <div className="mt-1 text-[13px] text-[#6B6B6B]">
                       {lookup.ticket.registrations?.ticket_tiers?.name} · {lookup.ticket.ticket_code}
                     </div>
+                    {has("approve") ? (
+                      <div className="mt-3 rounded-full border border-[#EDE6E3] px-4 py-2 text-center text-xs font-bold text-[#6B6B6B]">
+                        View only — you can&apos;t check people in
+                      </div>
+                    ) : (
                     <button
                       onClick={approve}
                       disabled={approving}
@@ -476,6 +465,7 @@ export default function AdminCheckInPage() {
                     >
                       {approving ? "Approving…" : "Approve check-in"}
                     </button>
+                    )}
                   </>
                 )}
               </div>
@@ -534,7 +524,7 @@ export default function AdminCheckInPage() {
                   >
                     Unverified
                   </span>
-                ) : (
+                ) : has("approve") ? null : (
                   <button
                     onClick={() => handleCheckIn(t)}
                     className="h-8 whitespace-nowrap rounded-full border border-[#EDE6E3] px-3.5 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B]"

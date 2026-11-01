@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
-import { isMissingColumn, requireAdmin } from "../_lib/auth";
+import { isMissingColumn, requireAccess } from "../_lib/auth";
 import {
   DECISION_STATUS,
   verifyState,
@@ -17,8 +17,8 @@ const COLUMNS =
 const DECISIONS: Decision[] = ["accepted", "declined", "unsuccessful"];
 
 export async function GET() {
-  const user = await requireAdmin();
-  if (!user) {
+  const access = await requireAccess("verification");
+  if (!access) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -54,6 +54,7 @@ export async function GET() {
     });
   }
 
+  const m = (item: string) => access.masked("verification", item);
   const registrations = data.map((r) => {
     const tier = r.ticket_tiers as { name: string } | null;
     const tickets = r.tickets as { ticket_code: string }[] | null;
@@ -61,29 +62,30 @@ export async function GET() {
     return {
       id: r.id,
       fullName: r.full_name,
-      email: r.email,
-      mobile: r.mobile,
-      amount: r.amount,
+      email: m("contact") ? "Hidden" : r.email,
+      mobile: m("contact") ? "Hidden" : r.mobile,
+      amount: m("amount") ? 0 : r.amount,
       decision: verifyState(
         r.status as PaymentStatus,
         (r.verification_decision as Decision | null | undefined) ?? null
       ),
-      upiTxnId: r.upi_txn_id,
+      upiTxnId: m("txn") ? "Hidden" : r.upi_txn_id,
       note: r.verification_note,
       verifiedAt: r.verified_at,
       createdAt: r.created_at,
       tierName: tier?.name ?? null,
       ticketCode: tickets?.[0]?.ticket_code ?? null,
-      proofUrl: proofPath ? signed.get(proofPath) ?? null : null,
+      proofUrl: !m("proof") && proofPath ? signed.get(proofPath) ?? null : null,
     };
   });
 
-  return NextResponse.json({ registrations });
+  const masks = ["contact", "txn", "amount", "proof", "decide"].filter(m);
+  return NextResponse.json({ registrations, masks });
 }
 
 export async function PATCH(request: Request) {
-  const user = await requireAdmin();
-  if (!user) {
+  const access = await requireAccess("verification");
+  if (!access || access.masked("verification", "decide")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -112,7 +114,7 @@ export async function PATCH(request: Request) {
     status,
     verification_note: status === "paid" ? null : reason || null,
     verified_at: status === "paid" ? new Date().toISOString() : null,
-    verified_by: status === "pending" ? null : user.id,
+    verified_by: status === "pending" ? null : access.id,
   };
   const save = (extra: object) =>
     admin

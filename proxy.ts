@@ -1,14 +1,34 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { updateSession } from "@/utils/supabase/middleware";
+import { createAdminClient } from "@/utils/supabase/admin";
+import { canView, firstPage, pageForPath, type Permissions, type Role } from "@/lib/permissions";
 
 const PROTECTED_PREFIXES = ["/events/registations", "/dashboard"];
 const ADMIN_LOGIN_PATH = "/admin/login";
 
-// Admin role lookups are cached briefly: every admin navigation (and its
-// prefetches) passes through here, and a DB round trip each time made the
-// sidebar feel slow. A demoted admin loses access within the TTL.
-const ADMIN_TTL_MS = 60_000;
-const adminCache = new Map<string, number>();
+// Portal role + permissions are cached briefly: every admin navigation (and its
+// prefetches) passes through here, and a DB round trip each time made the sidebar
+// feel slow. Changes to someone's access take effect within the TTL.
+const ACCESS_TTL_MS = 20_000;
+const accessCache = new Map<string, { role: Role | null; permissions: Permissions | null; exp: number }>();
+
+async function loadAccess(userId: string) {
+  const hit = accessCache.get(userId);
+  if (hit && hit.exp > Date.now()) return hit;
+
+  const admin = createAdminClient();
+  let res = await admin.from("profiles").select("role, permissions").eq("id", userId).single();
+  // permissions column missing (SQL not run yet): fall back to role only.
+  if (res.error) res = (await admin.from("profiles").select("role").eq("id", userId).single()) as typeof res;
+  const role = res.data?.role as Role | undefined;
+  const entry = {
+    role: role && ["admin", "manager", "staff"].includes(role) ? role : null,
+    permissions: ((res.data as { permissions?: Permissions | null } | null)?.permissions ?? null) as Permissions | null,
+    exp: Date.now() + ACCESS_TTL_MS,
+  };
+  accessCache.set(userId, entry);
+  return entry;
+}
 
 function redirectWithRefreshedCookies(
   url: URL,
@@ -22,7 +42,7 @@ function redirectWithRefreshedCookies(
 }
 
 export async function proxy(request: NextRequest) {
-  const { supabaseResponse, user, supabase } = await updateSession(request);
+  const { supabaseResponse, user } = await updateSession(request);
   const { pathname } = request.nextUrl;
 
   const isProtected = PROTECTED_PREFIXES.some((prefix) =>
@@ -46,21 +66,22 @@ export async function proxy(request: NextRequest) {
         supabaseResponse
       );
     }
-    let isAdmin = (adminCache.get(user.id) ?? 0) > Date.now();
-    if (!isAdmin) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      isAdmin = profile?.role === "admin";
-      if (isAdmin) adminCache.set(user.id, Date.now() + ADMIN_TTL_MS);
-      else adminCache.delete(user.id);
-    }
-    if (!isAdmin) {
+    const { role, permissions } = await loadAccess(user.id);
+    if (!role) {
       const url = new URL(ADMIN_LOGIN_PATH, request.url);
       url.searchParams.set("error", "not-admin");
       return redirectWithRefreshedCookies(url, supabaseResponse);
+    }
+    // Pages this person can't see are blocked here, not just hidden in the sidebar.
+    const page = pageForPath(pathname);
+    if (page && !canView(role, permissions, page)) {
+      const landing = firstPage(role, permissions);
+      if (!landing) {
+        const url = new URL(ADMIN_LOGIN_PATH, request.url);
+        url.searchParams.set("error", "no-access");
+        return redirectWithRefreshedCookies(url, supabaseResponse);
+      }
+      return redirectWithRefreshedCookies(new URL(landing.href, request.url), supabaseResponse);
     }
   }
 

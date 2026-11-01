@@ -78,6 +78,10 @@ export default function AdminVerificationPage() {
   const [rows, setRows] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  // Items an admin has masked for this account; the server already blanks the data.
+  const [masks, setMasks] = useState<string[]>([]);
+  const has = (item: string) => masks.includes(item);
+  const money = (n: number) => (masks.includes("amount") ? "₹ ••••" : fmt(n));
   const [saving, setSaving] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string; decision: Reasoned } | null>(
     null
@@ -104,6 +108,7 @@ export default function AdminVerificationPage() {
     }
     setLoadError("");
     setRows(data.registrations);
+    setMasks(data.masks ?? []);
     setLoading(false);
   }, []);
 
@@ -191,8 +196,8 @@ export default function AdminVerificationPage() {
 
       <div className="mt-7 grid grid-cols-2 gap-4 lg:grid-cols-4">
         {[
-          { l: "TO VERIFY", v: String(counts.pending), n: `${fmt(pendingAmount)} waiting` },
-          { l: "ACCEPTED", v: fmt(acceptedAmount), n: `${counts.accepted} tickets` },
+          { l: "TO VERIFY", v: String(counts.pending), n: `${money(pendingAmount)} waiting` },
+          { l: "ACCEPTED", v: money(acceptedAmount), n: `${counts.accepted} tickets` },
           { l: "DECLINED", v: String(counts.declined), n: "not a legit customer" },
           { l: "UNSUCCESSFUL", v: String(counts.unsuccessful), n: "payment didn't go through" },
         ].map((k) => (
@@ -271,7 +276,7 @@ export default function AdminVerificationPage() {
                       className="object-cover"
                     />
                   ) : (
-                    "No screenshot"
+                    has("proof") ? "Hidden" : "No screenshot"
                   )}
                 </button>
 
@@ -287,7 +292,7 @@ export default function AdminVerificationPage() {
                     </span>
                   </div>
                   <div className="mt-1 truncate text-[13px] text-[#6B6B6B]">
-                    {r.email} · {r.mobile}
+                    {has("contact") ? "Contact details hidden" : `${r.email} · ${r.mobile}`}
                   </div>
                   <div className="mt-3.5 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
                     <div>
@@ -300,7 +305,7 @@ export default function AdminVerificationPage() {
                       <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
                         AMOUNT
                       </div>
-                      <div className="mt-0.5 font-bold tabular-nums">{fmt(r.amount)}</div>
+                      <div className="mt-0.5 font-bold tabular-nums">{money(r.amount)}</div>
                     </div>
                     <div>
                       <div className="text-[11px] font-bold tracking-[0.12em] text-[#6B6B6B]">
@@ -389,38 +394,44 @@ export default function AdminVerificationPage() {
                   )}
                 </div>
 
+                {has("decide") ? (
+                  <div className="flex-none self-center rounded-full border border-[#EDE6E3] px-4 py-2 text-xs font-bold text-[#6B6B6B] lg:w-[132px] lg:text-center">
+                    View only
+                  </div>
+                ) : (
                 <div className="flex flex-none flex-wrap gap-2 lg:w-[132px] lg:flex-col">
-                  <button
-                    onClick={() => update(r, "accepted")}
-                    disabled={busy || r.decision === "accepted"}
-                    className="h-9 rounded-full bg-[#2F6B45] px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-35"
-                  >
-                    {r.decision === "accepted" ? "Accepted" : "Accept"}
-                  </button>
-                  <button
-                    onClick={() => startEdit(r, "declined")}
-                    disabled={busy}
-                    className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B] disabled:opacity-35"
-                  >
-                    Decline
-                  </button>
-                  <button
-                    onClick={() => startEdit(r, "unsuccessful")}
-                    disabled={busy}
-                    className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
-                  >
-                    Unsuccessful
-                  </button>
-                  {r.decision !== "pending" && (
                     <button
-                      onClick={() => startEdit(r, "pending")}
-                      disabled={busy}
-                      className="h-8 text-xs font-bold text-[#6B6B6B] hover:text-[#8A5A00] disabled:opacity-35"
+                      onClick={() => update(r, "accepted")}
+                      disabled={busy || r.decision === "accepted"}
+                      className="h-9 rounded-full bg-[#2F6B45] px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-35"
                     >
-                      Reset to pending
+                      {r.decision === "accepted" ? "Accepted" : "Accept"}
                     </button>
-                  )}
-                </div>
+                    <button
+                      onClick={() => startEdit(r, "declined")}
+                      disabled={busy}
+                      className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#E5251B] hover:text-[#E5251B] disabled:opacity-35"
+                    >
+                      Decline
+                    </button>
+                    <button
+                      onClick={() => startEdit(r, "unsuccessful")}
+                      disabled={busy}
+                      className="h-9 rounded-full border border-[#EDE6E3] px-4 text-[13px] font-bold hover:border-[#141414] disabled:opacity-35"
+                    >
+                      Unsuccessful
+                    </button>
+                    {r.decision !== "pending" && (
+                      <button
+                        onClick={() => startEdit(r, "pending")}
+                        disabled={busy}
+                        className="h-8 text-xs font-bold text-[#6B6B6B] hover:text-[#8A5A00] disabled:opacity-35"
+                      >
+                        Reset to pending
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -452,7 +463,7 @@ export default function AdminVerificationPage() {
               <div className="min-w-0">
                 <div className="truncate text-[15px] font-bold">{preview.fullName}</div>
                 <div className="text-xs tabular-nums text-[#6B6B6B]">
-                  UTR {preview.upiTxnId} · {fmt(preview.amount)}
+                  UTR {preview.upiTxnId} · {money(preview.amount)}
                 </div>
               </div>
               <button
