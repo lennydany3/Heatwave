@@ -4,7 +4,7 @@ import { clientIp, limit, tooManyRequests } from "@/lib/ratelimit";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { canView, firstPage, pageForPath, type Permissions, type Role } from "@/lib/permissions";
 
-const PROTECTED_PREFIXES = ["/events/registations", "/dashboard"];
+const PROTECTED_PREFIXES = ["/events/registations", "/dashboard", "/profile"];
 const ADMIN_LOGIN_PATH = "/admin/login";
 
 // Portal role + permissions are cached briefly: every admin navigation (and its

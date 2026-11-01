@@ -5,6 +5,7 @@ import Link from "next/link";
 import { QRCodeSVG } from "qrcode.react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import BottomNav, { BOTTOM_NAV_SPACE } from "@/components/BottomNav";
 import Navbar, { NAVBAR_OFFSET } from "@/components/Navbar";
 import SupportModal from "@/components/SupportModal";
 import { EVENT } from "@/lib/event";
@@ -421,7 +422,7 @@ export default function DashboardPage() {
 
   return (
     <div
-      className="min-h-screen bg-[#FAF7F5] pb-[calc(72px+env(safe-area-inset-bottom))] text-[#141414] lg:pb-0"
+      className={`min-h-screen bg-[#FAF7F5] text-[#141414] ${BOTTOM_NAV_SPACE}`}
       style={{ fontFamily: "var(--font-satoshi)" }}
     >
       <Navbar />
@@ -875,40 +876,7 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-3 border-t border-[#EDE6E3] bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-1.5 backdrop-blur-md lg:hidden">
-        <Link href="/dashboard" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#E5251B]">
-          <span className="flex h-7 w-12 items-center justify-center rounded-full bg-[#FDECEA]">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M4 7a2 2 0 012-2h12a2 2 0 012 2v2a2.5 2.5 0 000 5v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2a2.5 2.5 0 000-5V7z"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinejoin="round"
-              />
-              <path d="M14 5v13" stroke="currentColor" strokeWidth="2" strokeDasharray="2 2.5" />
-            </svg>
-          </span>
-          Tickets
-        </Link>
-        <Link href="/" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
-          <span className="flex h-7 w-12 items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
-              <path d="M15.5 8.5l-2 5-5 2 2-5 5-2z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
-            </svg>
-          </span>
-          Events
-        </Link>
-        <Link href="#" className="flex flex-col items-center gap-1 py-1.5 text-[11px] font-bold text-[#6B6B6B]">
-          <span className="flex h-7 w-12 items-center justify-center">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8.5" r="3.8" stroke="currentColor" strokeWidth="2" />
-              <path d="M4.5 20c1.2-3.6 4-5.5 7.5-5.5s6.3 1.9 7.5 5.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
-          </span>
-          Profile
-        </Link>
-      </nav>
+      <BottomNav />
     </div>
   );
 }

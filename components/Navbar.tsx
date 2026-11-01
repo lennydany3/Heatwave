@@ -119,6 +119,15 @@ export default function Navbar({
   }
 
   const href = (id: string) => (onHome ? `#${id}` : `/#${id}`);
+  const name =
+    (user?.user_metadata?.full_name as string | undefined) || user?.email?.split("@")[0] || "";
+  const initials =
+    name
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase())
+      .join("") || "U";
   const onDashboard = pathname.startsWith("/dashboard");
 
   return (
@@ -183,6 +192,18 @@ export default function Navbar({
                     }`}
                   >
                     My Tickets
+                  </Link>
+                  <Link
+                    href="/profile"
+                    aria-label="Profile"
+                    title="Profile"
+                    className={`ml-1 flex h-10 w-10 items-center justify-center rounded-full text-[13px] font-bold transition-shadow ${
+                      pathname.startsWith("/profile")
+                        ? "bg-[#E5251B] text-white"
+                        : "bg-[#F5F0EE] text-[#141414] hover:shadow-[0_0_0_2px_#E5251B]"
+                    }`}
+                  >
+                    {initials}
                   </Link>
                 </>
               ) : (
@@ -284,6 +305,18 @@ export default function Navbar({
                     05
                   </span>
                   My Tickets
+                </Link>
+              )}
+              {user && (
+                <Link
+                  href="/profile"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex items-baseline gap-4 border-b border-[#EDE6E3] py-4 text-[26px] font-black leading-none tracking-[-0.035em] active:text-[#E5251B]"
+                >
+                  <span className="w-6 flex-none text-xs font-bold tracking-[0.08em] text-[#E5251B] tabular-nums">
+                    06
+                  </span>
+                  Profile
                 </Link>
               )}
               <div className="mt-5">
