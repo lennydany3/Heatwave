@@ -1,7 +1,10 @@
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { eventSeats, myInvite } from "@/lib/seats";
+import { EVENT } from "@/lib/event";
+import { sendTicketEmail } from "@/lib/emails";
+import { siteUrl } from "@/lib/mail";
 
 const MOBILE_RE = /^\d{10}$/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -213,6 +216,25 @@ export async function POST(request: Request) {
     venue: string | null;
     starts_at: string | null;
   } | null;
+
+  // Email the ticket after the response is sent, so registering isn't slowed down
+  // (and never fails) because of the mail provider.
+  const base = siteUrl(request);
+  const finalTicketCode = ticketCode;
+  after(async () => {
+    const failure = await sendTicketEmail({
+      to: email,
+      siteUrl: base,
+      name: fullName,
+      eventName: EVENT.name,
+      venue: EVENT.venue,
+      startsAt: EVENT.startsAt,
+      tierName: tier.name,
+      ticketCode: finalTicketCode,
+      amount,
+    });
+    if (failure) console.error("[ticket-email] not sent to", email, "-", failure);
+  });
 
   return NextResponse.json({
     ticketCode,

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { isMissingColumn, requireAccess } from "../_lib/auth";
+import { sendVerificationEmail } from "@/lib/emails";
+import { siteUrl } from "@/lib/mail";
 import {
   DECISION_STATUS,
   verifyState,
@@ -110,6 +112,34 @@ export async function PATCH(request: Request) {
 
   const status: PaymentStatus = isPending ? "pending" : DECISION_STATUS[decision as Decision];
   const admin = createAdminClient();
+
+  // Read the registration first: we need who to email, and whether this actually
+  // changes the outcome (re-saving the same decision shouldn't email again).
+  const REG_COLS = "status, full_name, email, amount, ticket_tiers(name), tickets(ticket_code)";
+  let before = await admin
+    .from("registrations")
+    .select(`${REG_COLS}, verification_decision`)
+    .eq("id", registrationId)
+    .neq("status", "cancelled")
+    .single();
+  if (before.error && isMissingColumn(before.error.code)) {
+    before = (await admin
+      .from("registrations")
+      .select(REG_COLS)
+      .eq("id", registrationId)
+      .neq("status", "cancelled")
+      .single()) as unknown as typeof before;
+  }
+  const prev = before.data as unknown as {
+    status: PaymentStatus;
+    full_name: string;
+    email: string;
+    amount: number;
+    verification_decision?: Decision | null;
+    ticket_tiers: { name: string } | null;
+    tickets: { ticket_code: string }[] | null;
+  } | null;
+  const prevState = prev ? verifyState(prev.status, prev.verification_decision ?? null) : null;
   const fields = {
     status,
     verification_note: status === "paid" ? null : reason || null,
@@ -130,5 +160,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Could not update verification" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  // Tell the customer the outcome. A failed email never undoes the decision, but
+  // the admin is told so they can follow up another way.
+  let emailed: boolean | undefined;
+  const outcome = isPending ? "pending" : (decision as Decision);
+  if (prev && outcome !== prevState) {
+    const failure = await sendVerificationEmail({
+      outcome,
+      reason: reason || null,
+      to: prev.email,
+      siteUrl: siteUrl(request),
+      name: prev.full_name,
+      tierName: prev.ticket_tiers?.name ?? "Ticket",
+      amount: prev.amount,
+      ticketCode: prev.tickets?.[0]?.ticket_code ?? null,
+    });
+    emailed = !failure;
+    if (failure) console.error("[verification-email] not sent to", prev.email, "-", failure);
+  }
+  return NextResponse.json({ ok: true, emailed });
 }

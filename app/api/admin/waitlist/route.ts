@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/utils/supabase/admin";
 import { eventSeats } from "@/lib/seats";
+import { EVENT } from "@/lib/event";
+import { sendWaitlistInviteEmail } from "@/lib/emails";
+import { siteUrl } from "@/lib/mail";
 import { requireAccess } from "../_lib/auth";
 
 export async function GET() {
@@ -50,15 +53,23 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
   const admin = createAdminClient();
+  let invitee: { name: string; email: string; tierName: string | null } | null = null;
 
   // Inviting holds a seat, so there has to be one free: the admin must raise the
   // seat limit (or free a seat) first.
   if (body.status === "invited") {
     const { data: entry } = await admin
       .from("waitlist")
-      .select("event_id, ticket_tier_id, status")
+      .select("event_id, ticket_tier_id, status, full_name, email, ticket_tiers(name)")
       .eq("id", body.id)
       .single();
+    if (entry?.status === "waiting") {
+      invitee = {
+        name: entry.full_name,
+        email: entry.email,
+        tierName: (entry.ticket_tiers as unknown as { name: string } | null)?.name ?? null,
+      };
+    }
     if (!entry) return NextResponse.json({ error: "Entry not found" }, { status: 404 });
     if (entry.status === "waiting" && entry.ticket_tier_id) {
       const seats = (await eventSeats(admin, entry.event_id)).find(
@@ -84,7 +95,24 @@ export async function PATCH(request: Request) {
     .eq("id", body.id)
     .neq("status", "registered");
   if (error) return NextResponse.json({ error: "Could not update the entry" }, { status: 500 });
-  return NextResponse.json({ ok: true });
+
+  // Tell the customer they've been approved. The seat is held either way; if the
+  // email fails the admin is told so they can follow up another way.
+  let emailed: boolean | undefined;
+  if (invitee) {
+    const failure = await sendWaitlistInviteEmail({
+      to: invitee.email,
+      siteUrl: siteUrl(request),
+      name: invitee.name,
+      eventName: EVENT.name,
+      venue: EVENT.venue,
+      startsAt: EVENT.startsAt,
+      tierName: invitee.tierName,
+    });
+    emailed = !failure;
+    if (failure) console.error("[waitlist-email] not sent to", invitee.email, "-", failure);
+  }
+  return NextResponse.json({ ok: true, emailed });
 }
 
 export async function DELETE(request: Request) {

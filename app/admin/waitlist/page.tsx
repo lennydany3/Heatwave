@@ -109,7 +109,10 @@ export default function AdminWaitlistPage() {
       showToast(data?.error ?? "Couldn't update — try again");
       return;
     }
-    showToast(msg);
+    // Inviting also emails the customer; say so (or warn if that email failed).
+    if (data?.emailed === true) showToast(`${msg} · email sent`);
+    else if (data?.emailed === false) showToast(`${msg}, but the email couldn't be sent — contact them directly`);
+    else showToast(msg);
     await load();
   }
 

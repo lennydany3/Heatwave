@@ -158,7 +158,10 @@ export default function AdminVerificationPage() {
     }
     setEditing(null);
     setReason("");
-    showToast(`${row.fullName} marked ${LABEL[decision].toLowerCase()}`);
+    const marked = `${row.fullName} marked ${LABEL[decision].toLowerCase()}`;
+    if (data?.emailed === true) showToast(`${marked} · email sent`);
+    else if (data?.emailed === false) showToast(`${marked}, but the email couldn't be sent`);
+    else showToast(marked);
     await load();
   }
 
