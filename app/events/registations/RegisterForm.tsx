@@ -297,6 +297,7 @@ export default function RegisterForm({
   const [compressing, setCompressing] = useState(false);
   const [proofNote, setProofNote] = useState("");
   const [payTouched, setPayTouched] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
@@ -455,6 +456,7 @@ export default function RegisterForm({
   const txnError = UPI_TXN_RE.test(upiTxnId) ? "" : "Enter the 12-digit UPI transaction ID";
   const showTxnError = (txnTouched || payTouched) && focus !== "upiTxnId" ? txnError : "";
   const proofMissing = payTouched && !proof ? "Upload your payment screenshot" : "";
+  const confirmMissing = payTouched && !confirmed;
 
   async function onProofChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -499,7 +501,7 @@ export default function RegisterForm({
   async function handleSubmit() {
     if (submitting || !selectedTier || !gender) return;
     setPayTouched(true);
-    if (txnError || !proof) return;
+    if (txnError || !proof || !confirmed) return;
     setSubmitError("");
     setSubmitting(true);
 
@@ -1403,6 +1405,44 @@ export default function RegisterForm({
                   )}
                 </div>
 
+                <label
+                  htmlFor="hw-confirm"
+                  style={{
+                    borderColor: confirmMissing ? "#E5251B" : confirmed ? "#141414" : "#EDE6E3",
+                    background: confirmMissing ? "#FFF8F7" : "#fff",
+                  }}
+                  className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border px-3.5 py-3 transition-colors sm:p-4"
+                >
+                  <input
+                    id="hw-confirm"
+                    type="checkbox"
+                    checked={confirmed}
+                    onChange={(e) => setConfirmed(e.target.checked)}
+                    className="peer sr-only"
+                  />
+                  <span
+                    aria-hidden
+                    className={`mt-px flex h-5 w-5 flex-none items-center justify-center rounded-md border-2 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#E5251B]/40 ${
+                      confirmed ? "border-[#E5251B] bg-[#E5251B]" : confirmMissing ? "border-[#E5251B] bg-white" : "border-[#C9BFBB] bg-white"
+                    }`}
+                  >
+                    {confirmed && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12.5l4.5 4.5L19 7.5" stroke="#fff" strokeWidth="3.2" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                  <span className="text-[13px] leading-snug text-[#141414] sm:text-sm">
+                    I confirm that all details provided are accurate. Incorrect or incomplete
+                    credentials may result in ticket rejection, with no refund.
+                  </span>
+                </label>
+                {confirmMissing && (
+                  <div className="ml-1 mt-1.5 text-[13px] text-[#C8372D]">
+                    Tick the box to confirm your details
+                  </div>
+                )}
+
                 {submitError && (
                   <div className="mt-4 flex items-center gap-2 text-sm text-[#C8372D]">
                     <span className="h-1.5 w-1.5 rounded-full bg-[#E5251B]" />
@@ -1433,6 +1473,10 @@ export default function RegisterForm({
                   </button>
                 </div>
                 <div className="mt-4 pb-2 text-[13px] leading-relaxed text-[#6B6B6B] sm:text-right">
+                  <span className="mb-1.5 block">
+                    <span className="font-bold text-[#141414]">Disclaimer:</span> Incorrect or
+                    incomplete credentials may result in ticket rejection, with no refund.
+                  </span>
                   <span className="hidden sm:inline">
                     Your ticket is issued right away and activates once we verify the payment ·{" "}
                   </span>
