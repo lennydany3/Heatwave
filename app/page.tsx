@@ -87,6 +87,8 @@ export default function EventPage() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [showBar, setShowBar] = useState(false);
   const [tiers, setTiers] = useState<Tier[]>(FALLBACK_TIERS);
+  // Tiers that are full or manually closed: registration is replaced by the waitlist.
+  const [closedIds, setClosedIds] = useState<Record<string, boolean>>({});
   const { user, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
@@ -105,12 +107,23 @@ export default function EventPage() {
     let cancelled = false;
     async function loadTiers() {
       const supabase = createClient();
+      const availabilityReq = fetch(`/api/events/availability?slug=${EVENT.slug}`, {
+        cache: "no-store",
+      })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
       const { data: ev } = await supabase
         .from("events")
         .select("id")
         .eq("slug", EVENT.slug)
         .single();
       if (!ev || cancelled) return;
+      const avail = (await availabilityReq) as {
+        tiers: { tierId: string; registrationClosed: boolean }[];
+      } | null;
+      if (!cancelled && avail) {
+        setClosedIds(Object.fromEntries(avail.tiers.map((t) => [t.tierId, t.registrationClosed])));
+      }
       const { data } = await supabase
         .from("ticket_tiers")
         .select("id, name, price_male, price_female, status")
@@ -135,7 +148,7 @@ export default function EventPage() {
     }
   }, []);
 
-  const openTier = tiers.find((t) => t.status === "open");
+  const openTier = tiers.find((t) => t.status === "open" && !closedIds[t.id]);
   const openPrices = openTier
     ? [openTier.price_male, openTier.price_female].filter((n): n is number => !!n)
     : [];
@@ -259,7 +272,8 @@ export default function EventPage() {
                 onClick={handleRegisterClick}
                 className={`h-14 px-8 text-base ${btn}`}
               >
-                Register now <span>→</span>
+                {openTier || !tiers.some((t) => t.status !== "coming_soon") ? "Register now" : "Join waitlist"}{" "}
+                <span>→</span>
               </button>
               <span className="text-sm text-[#6B6B6B]">{EVENT.gateNote}</span>
             </div>
@@ -322,7 +336,7 @@ export default function EventPage() {
             {tiers.map((tier) => (
               <div
                 key={tier.id}
-                style={{ opacity: tier.status === "open" ? 1 : 0.6 }}
+                style={{ opacity: tier.status === "coming_soon" ? 0.6 : 1 }}
                 className="rounded-xl border border-[#EDE6E3] p-7"
               >
                 <div className="text-xs font-bold uppercase tracking-[0.12em] text-[#6B6B6B]">
@@ -331,16 +345,22 @@ export default function EventPage() {
                 <div className="mt-4 flex justify-between text-base">
                   <span className="text-[#6B6B6B]">Female</span>
                   <span className="text-[26px] font-black tracking-[-0.03em]">
-                    {money(tier.status === "open" ? tier.price_female : null)}
+                    {money(tier.status !== "coming_soon" ? tier.price_female : null)}
                   </span>
                 </div>
                 <div className="mt-2 flex justify-between text-base">
                   <span className="text-[#6B6B6B]">Male</span>
                   <span className="text-[26px] font-black tracking-[-0.03em]">
-                    {money(tier.status === "open" ? tier.price_male : null)}
+                    {money(tier.status !== "coming_soon" ? tier.price_male : null)}
                   </span>
                 </div>
-                <div className="mt-4 text-sm text-[#6B6B6B]">{TIER_NOTE[tier.status]}</div>
+                {tier.status !== "coming_soon" && (tier.status === "closed" || closedIds[tier.id]) ? (
+                  <div className="mt-4 text-sm font-bold text-[#B71C14]">
+                    Registration full · waitlist open
+                  </div>
+                ) : (
+                  <div className="mt-4 text-sm text-[#6B6B6B]">{TIER_NOTE[tier.status]}</div>
+                )}
               </div>
             ))}
           </div>

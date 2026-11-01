@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/utils/supabase/server";
 import { createAdminClient } from "@/utils/supabase/admin";
+import { eventSeats, myInvite } from "@/lib/seats";
 
 const MOBILE_RE = /^\d{10}$/;
 const EMAIL_RE = /^\S+@\S+\.\S+$/;
@@ -96,7 +97,11 @@ export async function POST(request: Request) {
   if (tierError || !tier) {
     return NextResponse.json({ error: "Ticket tier not found" }, { status: 404 });
   }
-  if (tier.status !== "open") {
+  // An admin-invited waitlist customer may register even if the tier is full
+  // or manually closed: their seat is already held for them.
+  const invite = await myInvite(admin, tier.event_id, user);
+  const invited = invite?.tierId === tier.id;
+  if (tier.status === "coming_soon" || (tier.status === "closed" && !invited)) {
     return NextResponse.json({ error: "This ticket tier isn't open yet" }, { status: 400 });
   }
 
@@ -116,6 +121,17 @@ export async function POST(request: Request) {
   if (existing && existing.length > 0) {
     return NextResponse.json(
       { error: ALREADY_REGISTERED, code: "already_registered" },
+      { status: 409 }
+    );
+  }
+
+  const seats = (await eventSeats(admin, tier.event_id)).find((x) => x.tierId === tier.id);
+  if (seats?.registrationClosed && !invited) {
+    return NextResponse.json(
+      {
+        error: "Registration for this ticket is full. Join the waitlist and we'll let you know if a seat opens up.",
+        code: "registration_full",
+      },
       { status: 409 }
     );
   }
@@ -152,6 +168,10 @@ export async function POST(request: Request) {
       );
     }
     return NextResponse.json({ error: "Could not create registration" }, { status: 500 });
+  }
+
+  if (invite) {
+    await admin.from("waitlist").update({ status: "registered" }).eq("id", invite.id);
   }
 
   const rollback = () => admin.from("registrations").delete().eq("id", registration.id);

@@ -3,6 +3,7 @@ export type AdminPageKey =
   | "events"
   | "verification"
   | "customers"
+  | "waitlist"
   | "checkin"
   | "payments"
   | "settings";
@@ -12,6 +13,7 @@ export const ADMIN_NAV: { key: AdminPageKey; label: string; href: string }[] = [
   { key: "events", label: "Events", href: "/admin/events" },
   { key: "verification", label: "Verification", href: "/admin/verification" },
   { key: "customers", label: "Customers", href: "/admin/customers" },
+  { key: "waitlist", label: "Waitlist", href: "/admin/waitlist" },
   { key: "checkin", label: "Check-in", href: "/admin/check-in" },
   { key: "payments", label: "Payments", href: "/admin/payments" },
   { key: "settings", label: "Settings", href: "#" },

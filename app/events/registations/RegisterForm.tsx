@@ -34,6 +34,13 @@ type EventInfo = {
   starts_at: string | null;
 };
 
+type TierAvailability = {
+  tierId: string;
+  registrationClosed: boolean;
+  remaining: number | null;
+  invited: boolean;
+};
+
 type TicketResult = {
   ticketCode: string;
   tierName?: string;
@@ -91,6 +98,17 @@ const MASK: Partial<Record<FieldKey, (v: string) => string>> = {
 };
 
 const fmt = (n: number) => "₹" + n.toLocaleString("en-IN");
+
+async function fetchAvailability(): Promise<Record<string, TierAvailability>> {
+  try {
+    const res = await fetch(`/api/events/availability?slug=${EVENT.slug}`, { cache: "no-store" });
+    if (!res.ok) return {};
+    const data = (await res.json()) as { tiers: TierAvailability[] };
+    return Object.fromEntries(data.tiers.map((t) => [t.tierId, t]));
+  } catch {
+    return {};
+  }
+}
 
 function downloadIcs(event: EventInfo | null) {
   if (!event) return;
@@ -215,6 +233,10 @@ export default function RegisterForm({
   const [tiers, setTiers] = useState<TicketTier[]>([]);
   const [tiersLoading, setTiersLoading] = useState(true);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<Record<string, TierAvailability>>({});
+  const [joining, setJoining] = useState(false);
+  const [waitlistError, setWaitlistError] = useState("");
+  const [waitlisted, setWaitlisted] = useState<{ position: number | null } | null>(null);
 
   const [upiTxnId, setUpiTxnId] = useState("");
   const [txnTouched, setTxnTouched] = useState(false);
@@ -251,17 +273,25 @@ export default function RegisterForm({
         setTiersLoading(false);
         return;
       }
-      const { data: tierRows } = await supabase
-        .from("ticket_tiers")
-        .select("id, code, name, price_male, price_female, status, sort_order")
-        .eq("event_id", eventRow.id)
-        .order("sort_order");
+      const [{ data: tierRows }, avail] = await Promise.all([
+        supabase
+          .from("ticket_tiers")
+          .select("id, code, name, price_male, price_female, status, sort_order")
+          .eq("event_id", eventRow.id)
+          .order("sort_order"),
+        fetchAvailability(),
+      ]);
       if (cancelled) return;
       setEvent(eventRow);
       const list = tierRows ?? [];
       setTiers(list);
-      const open = list.find((t) => t.status === "open");
-      if (open) setSelectedTierId(open.id);
+      setAvailability(avail);
+      // Prefer a tier that's open for registration; otherwise a full / closed one
+      // (which leads to the waitlist).
+      const pick =
+        list.find((t) => t.status === "open" && !avail[t.id]?.registrationClosed) ??
+        list.find((t) => t.status !== "coming_soon");
+      if (pick) setSelectedTierId(pick.id);
       setTiersLoading(false);
     }
     load();
@@ -328,6 +358,48 @@ export default function RegisterForm({
       ? (gender === "male" ? selectedTier.price_male : selectedTier.price_female) ?? 0
       : 0;
 
+  // A tier is "closed" for new registrations when it's manually closed or full.
+  // Customers then join the waitlist instead of paying.
+  const isClosed = (t: TicketTier) =>
+    t.status === "closed" || (t.status === "open" && !!availability[t.id]?.registrationClosed);
+  const selectedClosed = !!selectedTier && isClosed(selectedTier);
+
+  async function joinWaitlist() {
+    if (!selectedTier || !gender || joining) return;
+    setJoining(true);
+    setWaitlistError("");
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticketTierId: selectedTier.id,
+          fullName: values.fullName ?? "",
+          email: values.email ?? "",
+          mobile: values.mobile ?? "",
+          instagram: values.instagram ?? "",
+          age: Number(values.age ?? 0),
+          gender,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        if (data?.code === "already_registered") {
+          setExisting({ status: "pending", ticketCode: null, eventName: event?.name ?? null });
+          return;
+        }
+        setWaitlistError(data?.error || "Could not join the waitlist");
+        return;
+      }
+      setWaitlisted({ position: data.position ?? null });
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch {
+      setWaitlistError("Something went wrong. Try again.");
+    } finally {
+      setJoining(false);
+    }
+  }
+
   const txnError = UPI_TXN_RE.test(upiTxnId) ? "" : "Enter the 12-digit UPI transaction ID";
   const showTxnError = (txnTouched || payTouched) && focus !== "upiTxnId" ? txnError : "";
   const proofMissing = payTouched && !proof ? "Upload your payment screenshot" : "";
@@ -386,6 +458,12 @@ export default function RegisterForm({
           setExisting({ status: "pending", ticketCode: null, eventName: event?.name ?? null });
           return;
         }
+        if (data.code === "registration_full") {
+          // Seats ran out while this customer was filling the form.
+          setAvailability(await fetchAvailability());
+          go(1);
+          return;
+        }
         setSubmitError(data.error || "Could not complete payment");
         return;
       }
@@ -399,6 +477,39 @@ export default function RegisterForm({
   }
 
   const steps = ["Details", "Tickets", "Payment"];
+
+  if (waitlisted) {
+    return (
+      <Page>
+        <main className="mx-auto flex max-w-[640px] flex-col items-center px-6 py-16 text-center sm:py-24">
+          <div className="flex h-24 w-24 animate-[hwPop_0.5s_cubic-bezier(.2,.9,.3,1.2)_both] items-center justify-center rounded-full bg-[#141414]">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="9" stroke="#fff" strokeWidth="1.8" />
+              <path d="M12 7v5l3 2" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
+          </div>
+          <h1 className="m-0 mt-7 text-[40px] font-black leading-[0.95] tracking-[-0.05em] sm:text-[60px]">
+            You&apos;re on the waitlist
+          </h1>
+          {waitlisted.position && (
+            <div className="mt-5 inline-flex rounded-full border border-[#EDE6E3] bg-[#FAF7F5] px-4 py-2 text-sm">
+              Your place in the queue:{" "}
+              <span className="ml-1.5 font-bold tabular-nums">#{waitlisted.position}</span>
+            </div>
+          )}
+          <p className="mt-5 max-w-[46ch] text-[17px] leading-relaxed text-[#6B6B6B]">
+            Registration for {EVENT.name} is full right now. Some seats open up when payments
+            can&apos;t be verified — if one frees up for you, we&apos;ll contact you on{" "}
+            <span className="font-medium text-[#141414]">{values.email}</span> and your seat will be
+            held for you to register. No payment is needed until then.
+          </p>
+          <Link href="/" className={`mt-8 ${btn}`}>
+            Back to event page
+          </Link>
+        </main>
+      </Page>
+    );
+  }
 
   if (existing && !ticketResult) {
     return (
@@ -686,24 +797,27 @@ export default function RegisterForm({
                 ) : (
                   <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                     {tiers.map((tier) => {
-                      const open = tier.status === "open";
+                      const closed = isClosed(tier);
+                      const open = tier.status === "open" && !closed;
+                      const selectable = tier.status !== "coming_soon";
                       const on = tier.id === selectedTierId;
                       const price = gender === "male" ? tier.price_male : tier.price_female;
+                      const left = availability[tier.id]?.remaining;
                       return (
                         <button
                           key={tier.id}
                           type="button"
-                          disabled={!open}
-                          onClick={() => open && setSelectedTierId(tier.id)}
+                          disabled={!selectable}
+                          onClick={() => selectable && setSelectedTierId(tier.id)}
                           style={{
                             borderColor: on ? "#E5251B" : "#EDE6E3",
                             boxShadow: on ? "0 0 0 1px #E5251B" : "none",
-                            opacity: open ? 1 : 0.55,
-                            cursor: open ? "pointer" : "not-allowed",
+                            opacity: selectable ? 1 : 0.55,
+                            cursor: selectable ? "pointer" : "not-allowed",
                           }}
                           className="relative flex flex-col gap-1.5 rounded-xl border bg-white p-[22px] text-left transition-transform duration-200 enabled:hover:-translate-y-0.5"
                         >
-                          {on && open && (
+                          {on && selectable && (
                             <span className="absolute right-4 top-4 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#E5251B]">
                               <svg width="12" height="12" viewBox="0 0 24 24">
                                 <path
@@ -721,14 +835,40 @@ export default function RegisterForm({
                             {tier.name}
                           </span>
                           <span className="text-[28px] font-black tracking-[-0.03em]">
-                            {open && price ? fmt(price) : "× × ×"}
+                            {selectable && price ? fmt(price) : "× × ×"}
                           </span>
-                          <span className="text-sm leading-snug text-[#6B6B6B]">
-                            {open ? "Limited early-bird price" : "Announced soon"}
+                          <span
+                            className="text-sm leading-snug"
+                            style={{ color: closed ? "#B71C14" : "#6B6B6B" }}
+                          >
+                            {!selectable
+                              ? "Announced soon"
+                              : closed
+                                ? "Registration full · join the waitlist"
+                                : left !== null && left !== undefined && left <= 10
+                                  ? `Only ${left} seat${left === 1 ? "" : "s"} left`
+                                  : "Limited early-bird price"}
                           </span>
                         </button>
                       );
                     })}
+                  </div>
+                )}
+
+                {selectedClosed && (
+                  <div className="mt-5 rounded-xl bg-[#FFF6E5] px-5 py-4 text-sm leading-relaxed text-[#8A5A00]">
+                    <span className="font-bold">
+                      Registration for {selectedTier?.name} is full right now.
+                    </span>{" "}
+                    Join the waitlist with the details you just entered. Seats free up when payments
+                    can&apos;t be verified, and we&apos;ll invite people in order. You won&apos;t be
+                    charged now.
+                  </div>
+                )}
+                {waitlistError && (
+                  <div className="mt-4 flex items-center gap-2 text-sm text-[#C8372D]">
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#E5251B]" />
+                    {waitlistError}
                   </div>
                 )}
 
@@ -739,9 +879,19 @@ export default function RegisterForm({
                   >
                     ← Back
                   </button>
-                  <button onClick={() => selectedTier && go(2)} disabled={!selectedTier} className={btn}>
-                    Continue to payment →
-                  </button>
+                  {selectedClosed ? (
+                    <button
+                      onClick={joinWaitlist}
+                      disabled={joining || !selectedTier}
+                      className={`min-w-[200px] ${btn}`}
+                    >
+                      {joining ? "Joining…" : "Join waitlist →"}
+                    </button>
+                  ) : (
+                    <button onClick={() => selectedTier && go(2)} disabled={!selectedTier} className={btn}>
+                      Continue to payment →
+                    </button>
+                  )}
                 </div>
               </section>
             )}
