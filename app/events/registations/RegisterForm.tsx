@@ -1164,7 +1164,6 @@ export default function RegisterForm({
                       const selectable = tier.status !== "coming_soon";
                       const on = tier.id === selectedTierId;
                       const price = gender === "male" ? tier.price_male : tier.price_female;
-                      const left = availability[tier.id]?.remaining;
                       return (
                         <button
                           key={tier.id}
@@ -1207,9 +1206,7 @@ export default function RegisterForm({
                               ? "Announced soon"
                               : closed
                                 ? "Registration full · join the waitlist"
-                                : left !== null && left !== undefined && left <= 10
-                                  ? `Only ${left} seat${left === 1 ? "" : "s"} left`
-                                  : "Limited early-bird price"}
+                                : "Limited early-bird price"}
                           </span>
                         </button>
                       );
